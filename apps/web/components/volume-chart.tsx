@@ -23,16 +23,17 @@ export function VolumeChart({
 
   return (
     <div className={cn("space-y-3", className)}>
-      <div className="flex h-48 items-end gap-2 rounded-[24px] border border-border/70 bg-background/70 p-4">
+      <div className="relative flex h-48 items-end gap-2 overflow-hidden rounded-[24px] border border-border/70 bg-black/25 p-4">
+        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,rgba(148,163,184,0.08)_1px,transparent_1px)] bg-[size:100%_25%]" />
         {points.map((point) => {
           const value = Number(point.amount);
           const height = maximum > 0 ? Math.max(12, (value / maximum) * 100) : 12;
 
           return (
-            <div key={point.date} className="flex flex-1 flex-col items-center justify-end gap-2">
+            <div key={point.date} className="relative flex flex-1 flex-col items-center justify-end gap-2">
               <div
                 className={cn(
-                  "w-full rounded-t-full bg-gradient-to-t from-[color:var(--chart-2)] to-[color:var(--chart-1)]",
+                  "w-full rounded-t-full border border-white/10 bg-gradient-to-t from-[color:var(--chart-2)] via-[#1d4ed8] to-[color:var(--chart-1)] shadow-[0_18px_40px_-20px_rgba(125,211,252,0.75)]",
                   value === 0 && "opacity-25"
                 )}
                 style={{ height: `${height}%` }}

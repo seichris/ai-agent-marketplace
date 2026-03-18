@@ -50,36 +50,34 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-10 px-6 py-8 md:px-10 md:py-12">
-      <section className="relative overflow-hidden rounded-[36px] border border-border/70 bg-[linear-gradient(140deg,rgba(255,250,240,0.96),rgba(249,240,216,0.84)_58%,rgba(238,223,182,0.7))] px-6 py-8 shadow-[0_30px_120px_-60px_rgba(15,23,42,0.55)] md:px-10 md:py-12">
-        <div className="absolute inset-y-0 right-0 hidden w-1/3 bg-[radial-gradient(circle_at_top,rgba(217,119,6,0.22),transparent_55%)] md:block" />
-        <div className="relative grid gap-8 lg:grid-cols-[1.4fr_0.8fr]">
+      <section className="relative overflow-hidden rounded-[36px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.16),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(52,211,153,0.14),transparent_24%),linear-gradient(160deg,rgba(10,14,26,0.94),rgba(9,12,20,0.96))] px-6 py-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,1)] md:px-10 md:py-12">
+        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_center,rgba(125,211,252,0.12),transparent_48%)] md:block" />
+        <div className="relative grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
           <div className="space-y-5">
-            <Badge className="bg-background/75 text-foreground">Fast-native agent marketplace</Badge>
+            <Badge className="bg-white/[0.06] text-foreground">Fast-native agent marketplace</Badge>
             <div className="space-y-4">
               <h1 className="max-w-3xl font-sans text-4xl font-semibold tracking-tight text-foreground md:text-6xl">
-                Paid APIs for agents, presented like a real marketplace.
+                Discover and price agent-ready APIs in a live market catalog.
               </h1>
               <p className="max-w-2xl text-base leading-7 text-foreground/72 md:text-lg">
-                Browse live x402 routes, copy exact agent-ready usage prompts, and suggest the next endpoints or source
-                integrations providers should build.
+                Browse paid x402 routes, compare service performance, copy exact usage prompts, and steer supply by
+                suggesting the next endpoints or source integrations providers should ship.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button onClick={() => window.location.assign("/suggest")}>
-                Suggest a source
-              </Button>
+              <Button onClick={() => window.location.assign("/suggest?type=endpoint")}>Suggest an endpoint</Button>
               <Button variant="secondary" onClick={() => window.location.assign("/skill.md")}>
                 Read SKILL.md
               </Button>
             </div>
           </div>
 
-          <Card className="border-black/5 bg-black/[0.02]">
+          <Card className="border-white/10 bg-black/20">
             <CardHeader>
               <CardDescription>Marketplace totals</CardDescription>
-              <CardTitle className="text-3xl">Live catalog snapshot</CardTitle>
+              <CardTitle className="text-3xl">Catalog snapshot</CardTitle>
             </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+            <CardContent className="grid gap-4 sm:grid-cols-2">
               <div>
                 <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Services</div>
                 <div className="mt-2 text-3xl font-semibold">{services.length}</div>
@@ -92,12 +90,16 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
                 <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Call volume</div>
                 <div className="mt-2 text-3xl font-semibold">{totals.calls}</div>
               </div>
+              <div>
+                <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Revenue</div>
+                <div className="mt-2 text-3xl font-semibold">${totals.revenue.toFixed(2)}</div>
+              </div>
             </CardContent>
           </Card>
         </div>
       </section>
 
-      <section className="grid gap-4 md:grid-cols-[1fr_auto]">
+      <section className="grid gap-4 rounded-[30px] border border-border/70 bg-card/85 p-4 md:grid-cols-[1fr_auto]">
         <label className="relative block">
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
           <Input
@@ -115,8 +117,8 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
               onClick={() => setCategory(item)}
               className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
                 item === category
-                  ? "border-foreground bg-foreground text-background"
-                  : "border-border bg-card text-foreground hover:bg-muted"
+                  ? "border-white bg-white text-black"
+                  : "border-border bg-black/10 text-foreground hover:bg-white/8"
               }`}
             >
               {item}
@@ -128,7 +130,7 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
       <section className="grid gap-5 lg:grid-cols-2">
         {filtered.map((service) => (
           <Link key={service.slug} href={`/services/${service.slug}`} className="group">
-            <Card className="h-full transition-transform duration-200 group-hover:-translate-y-1">
+            <Card className="h-full overflow-hidden transition-transform duration-200 group-hover:-translate-y-1">
               <CardHeader className="gap-4">
                 <div className="flex flex-wrap items-center gap-2">
                   <Badge>{service.ownerName}</Badge>
@@ -170,7 +172,7 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
                 </div>
 
                 <div className="flex items-center justify-between border-t border-border/70 pt-4 text-sm text-muted-foreground">
-                  <span>Open service page</span>
+                  <span>Open service</span>
                   <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
                 </div>
               </CardContent>

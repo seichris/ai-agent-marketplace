@@ -7,6 +7,6 @@ describe("skill markdown route", () => {
     const response = await GET();
 
     expect(response.headers.get("content-type")).toContain("text/markdown");
-    await expect(response.text()).resolves.toContain("# Fast Marketplace Skill");
+    await expect(response.text()).resolves.toContain("name: fast-marketplace");
   });
 });

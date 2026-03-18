@@ -16,7 +16,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 export function ServicePage({ service }: { service: ServiceDetail }) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 md:py-12">
-      <section className="grid gap-6 rounded-[36px] border border-border/70 bg-[linear-gradient(145deg,rgba(254,249,240,0.96),rgba(247,238,214,0.85)_55%,rgba(234,217,178,0.78))] p-8 shadow-[0_30px_120px_-60px_rgba(15,23,42,0.55)] lg:grid-cols-[1.3fr_0.9fr]">
+      <section className="grid gap-6 rounded-[36px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(52,211,153,0.12),transparent_24%),linear-gradient(160deg,rgba(10,14,26,0.94),rgba(9,12,20,0.96))] p-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,1)] lg:grid-cols-[1.3fr_0.9fr]">
         <div className="space-y-6">
           <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
             <Link href="/" className="font-medium text-foreground hover:text-foreground/80">
@@ -30,7 +30,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
             <div className="flex flex-wrap items-center gap-3">
               <Badge>{service.summary.ownerName}</Badge>
               <span className="text-sm uppercase tracking-[0.18em] text-muted-foreground">
-                {service.summary.priceRange}
+                {service.summary.priceRange} per call
               </span>
             </div>
             <div>
@@ -58,7 +58,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
           </div>
         </div>
 
-        <Card className="bg-background/65">
+        <Card className="bg-black/20">
           <CardHeader>
             <CardDescription>Transaction Volume (30d)</CardDescription>
             <CardTitle className="text-2xl">Paid call flow over time</CardTitle>
@@ -73,7 +73,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
         <Card>
           <CardHeader>
             <CardDescription>About this service</CardDescription>
-            <CardTitle className="text-2xl">What providers and agents get here</CardTitle>
+            <CardTitle className="text-2xl">Service profile</CardTitle>
           </CardHeader>
           <CardContent className="space-y-5 text-sm leading-7 text-foreground/80">
             <p>{service.about}</p>
@@ -93,7 +93,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
             <div className="flex items-center justify-between gap-4">
               <div>
                 <CardDescription>Use this service</CardDescription>
-                <CardTitle className="text-2xl">Copy into your agent</CardTitle>
+                <CardTitle className="text-2xl">Agent-ready prompt block</CardTitle>
               </div>
               <CopyButton value={service.useThisServicePrompt} />
             </div>
@@ -102,7 +102,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="rounded-[24px] border border-border/70 bg-background/80 p-4">
+            <div className="rounded-[24px] border border-border/70 bg-black/25 p-4">
               <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/82">
                 {service.useThisServicePrompt}
               </pre>
@@ -142,7 +142,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
                   </AccordionTrigger>
                   <AccordionContent>
                     <div className="grid gap-5 lg:grid-cols-2">
-                      <div className="space-y-4 rounded-[24px] border border-border/70 bg-background/70 p-4">
+                      <div className="space-y-4 rounded-[24px] border border-border/70 bg-black/20 p-4">
                         <div className="flex items-center justify-between gap-3">
                           <div>
                             <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Proxy URL</div>
@@ -180,7 +180,7 @@ function StatCard({
   icon: ReactNode;
 }) {
   return (
-    <div className="rounded-[24px] border border-border/70 bg-background/65 p-4">
+    <div className="rounded-[24px] border border-border/70 bg-black/20 p-4">
       <div className="flex items-center justify-between gap-3 text-muted-foreground">
         <div className="text-[11px] uppercase tracking-[0.2em]">{label}</div>
         {icon}
@@ -192,7 +192,7 @@ function StatCard({
 
 function ExampleBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="space-y-3 rounded-[24px] border border-border/70 bg-background/70 p-4">
+    <div className="space-y-3 rounded-[24px] border border-border/70 bg-black/20 p-4">
       <div className="flex items-center justify-between gap-3">
         <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
         <CopyButton value={value} />

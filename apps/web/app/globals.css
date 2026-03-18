@@ -14,16 +14,17 @@
 }
 
 :root {
-  --background: #f8f2e4;
-  --foreground: #161616;
-  --card: rgba(255, 251, 245, 0.9);
-  --card-foreground: #161616;
-  --muted: rgba(56, 36, 18, 0.08);
-  --muted-foreground: #68594b;
-  --border: rgba(22, 22, 22, 0.12);
-  --ring: #d97706;
-  --chart-1: #d97706;
-  --chart-2: #0f766e;
+  color-scheme: dark;
+  --background: #060911;
+  --foreground: #eff5ff;
+  --card: rgba(9, 13, 24, 0.82);
+  --card-foreground: #eff5ff;
+  --muted: rgba(148, 163, 184, 0.09);
+  --muted-foreground: #93a4c2;
+  --border: rgba(148, 163, 184, 0.16);
+  --ring: #7dd3fc;
+  --chart-1: #7dd3fc;
+  --chart-2: #34d399;
 }
 
 * {
@@ -39,6 +40,7 @@ body {
   font-family: var(--font-space-grotesk), sans-serif;
   color: var(--foreground);
   background: var(--background);
+  min-height: 100vh;
 }
 
 a {
@@ -56,4 +58,9 @@ select {
 pre,
 code {
   font-family: var(--font-ibm-plex-mono), monospace;
+}
+
+::selection {
+  background: rgba(125, 211, 252, 0.26);
+  color: var(--foreground);
 }

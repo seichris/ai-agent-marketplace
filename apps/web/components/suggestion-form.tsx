@@ -25,9 +25,11 @@ export function SuggestionForm({
   defaultType: "endpoint" | "source";
 }) {
   const [state, action, pending] = useActionState(submitSuggestionAction, initialState);
+  const selectClassName =
+    "h-12 rounded-2xl border border-border bg-black/20 px-4 text-sm text-foreground outline-none transition-colors focus:border-ring";
 
   return (
-    <Card>
+    <Card className="bg-[linear-gradient(180deg,rgba(10,14,26,0.9),rgba(9,12,20,0.92))]">
       <CardHeader>
         <CardDescription>Suggest new supply</CardDescription>
         <CardTitle className="text-3xl">Tell providers what to build next</CardTitle>
@@ -40,7 +42,7 @@ export function SuggestionForm({
               <select
                 name="type"
                 defaultValue={defaultType}
-                className="h-12 rounded-2xl border border-border bg-background px-4 text-sm"
+                className={selectClassName}
               >
                 <option value="endpoint">Endpoint</option>
                 <option value="source">Source / Webservice</option>
@@ -51,7 +53,7 @@ export function SuggestionForm({
               <select
                 name="serviceSlug"
                 defaultValue={defaultServiceSlug ?? ""}
-                className="h-12 rounded-2xl border border-border bg-background px-4 text-sm"
+                className={selectClassName}
               >
                 <option value="">No specific service</option>
                 {services.map((service) => (
@@ -96,7 +98,9 @@ export function SuggestionForm({
           {state.message ? (
             <div
               className={`rounded-2xl border px-4 py-3 text-sm ${
-                state.ok ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-900" : "border-rose-500/30 bg-rose-500/10 text-rose-900"
+                state.ok
+                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
+                  : "border-rose-400/30 bg-rose-400/10 text-rose-200"
               }`}
             >
               {state.message}

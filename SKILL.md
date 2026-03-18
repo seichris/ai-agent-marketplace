@@ -1,47 +1,91 @@
-# Fast Marketplace Skill
+---
+name: fast-marketplace
+description: Discover services on the Fast Marketplace, choose the right endpoint, follow the Fast-native x402 payment flow with a funded local wallet, handle async job retrieval, and submit missing endpoint or source suggestions. Use this when a user wants to browse or call APIs exposed through fast.8o.vc or fastapi.8o.vc.
+---
 
-Use this skill when you want an agent to discover and call paid APIs from the Fast Marketplace.
+# Fast Marketplace
 
-## What this skill does
+Use this skill when a user wants to work with APIs listed on the Fast Marketplace.
 
-- finds marketplace services and endpoints
-- explains the exact request body for each endpoint
-- uses a funded local Fast wallet to pay x402 routes
-- handles async job polling and repeat retrieval
+## Use this skill when
 
-## Setup
+- the user wants to find a service or endpoint on `https://fast.8o.vc`
+- the user needs the exact request body, proxy URL, or response shape for a marketplace endpoint
+- the user needs to call a paid Fast-native x402 route with a local Fast wallet
+- the user needs to retrieve an async result from a previously paid job
+- the user wants to suggest a missing endpoint or a new source/webservice for providers to build
 
-1. Create or load a local Fast wallet.
-2. Fund the wallet with `fastUSDC`.
-3. Open the marketplace catalog at `https://fast.8o.vc`.
-4. Review the service page you want to use.
-5. Copy the generated “Use this service” block into your agent or workflow.
+## Do not use this skill when
+
+- the user wants a direct provider integration outside the marketplace
+- the user wants a browser wallet flow; v1 is marketplace discovery plus API and CLI usage
+- the task is generic web research rather than using marketplace routes
+
+## Inputs to gather
+
+Before acting, identify:
+
+- the service or domain the user wants
+- the endpoint or outcome they need
+- whether the route is free, paid, sync, or async
+- whether they already have a funded Fast wallet
+
+## Workflow
+
+1. Open the marketplace UI at `https://fast.8o.vc` and locate the relevant service.
+2. Open the service page and use the published endpoint docs, pricing, and examples.
+3. If the user is delegating the task to another agent, copy the service page's "Use this service" block or the canonical skill URL.
+4. For paid routes, send the first request without payment proof and read the `402 Payment Required` response.
+5. Pay from the funded local Fast wallet and retry the same request with the payment proof headers.
+6. If the route returns `202 Accepted`, store the `jobToken` and switch to wallet-bound retrieval.
+7. If the marketplace does not have the needed capability, submit a suggestion for an endpoint or source.
 
 ## Payment flow
 
-1. Send the first request to the paid endpoint without a payment proof.
-2. Read the `402 Payment Required` response.
-3. Authorize payment from the Fast wallet.
-4. Retry the same request with the payment signature/proof.
+The marketplace is Fast-native and wallet-first.
 
-## Async flow
+1. Use a persistent local Fast wallet funded with `fastUSDC`.
+2. Send the first request without payment proof.
+3. Read the `402` response and payment requirements.
+4. Authorize payment from the wallet.
+5. Retry the same request with the payment proof.
 
-1. If a route returns `202 Accepted`, store the `jobToken`.
-2. Create a wallet-bound auth session for that job if needed.
-3. Poll the job result until it completes or fails.
-4. If the job fails permanently after acceptance, the marketplace refund policy applies.
+Important constraints:
 
-## Discovery
+- paid routes do not use long-lived API keys
+- wallet identity is the payer identity
+- use the same request body when retrying a paid request
+- for safe retries, keep the same payment identifier for the same normalized request only
+
+## Async retrieval flow
+
+1. If a paid trigger returns `202`, persist the `jobToken`.
+2. Create the wallet-bound auth session for that job when prompted.
+3. Poll `GET /api/jobs/{jobToken}` until the job completes or fails.
+4. Use the same wallet that paid for the original trigger.
+
+## Troubleshooting
+
+- `402 Payment Required`: the route is payable; submit payment and retry the same request
+- `401 Unauthorized` on job retrieval: create a wallet-bound session from the same paying wallet
+- `409 Conflict`: the payment identifier was reused with a different request body
+- permanent async failure after acceptance: the marketplace refund policy applies
+- missing service or endpoint: submit a suggestion from the marketplace UI
+
+## Discovery and reference URLs
 
 - Marketplace UI: `https://fast.8o.vc`
-- Skill URL: `https://fast.8o.vc/skill.md`
+- Canonical skill: `https://fast.8o.vc/skill.md`
+- Suggest an endpoint: `https://fast.8o.vc/suggest?type=endpoint`
+- Suggest a source: `https://fast.8o.vc/suggest?type=source`
 - OpenAPI: `https://fastapi.8o.vc/openapi.json`
 - LLM summary: `https://fastapi.8o.vc/llms.txt`
 - Marketplace catalog JSON: `https://fastapi.8o.vc/.well-known/marketplace.json`
 
-## Notes
+## Example requests that should trigger this skill
 
-- The paid data plane does not use long-lived API keys.
-- Wallet identity is the payer identity.
-- Polling and repeat reads are tied to the wallet that paid.
-- If a needed endpoint or source does not exist yet, submit a suggestion from the marketplace UI.
+- "Find me a paid Fast API for research signals."
+- "Show me the exact curl body for a marketplace endpoint."
+- "Call this Fast marketplace route and handle the 402 payment."
+- "Retrieve the result for a previously paid async marketplace job."
+- "Suggest a new source or endpoint for the marketplace."
