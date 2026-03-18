@@ -185,7 +185,8 @@ The web app supports wallet login with the Fast browser extension through `@fast
 
 - login happens in the site header via a signed wallet challenge
 - this creates a short-lived website session token
-- paid API execution is still CLI-first; browser payment execution is not implemented yet
+- service pages also support in-browser x402 execution for endpoints through the extension
+- async browser calls can refresh job results by signing a job-specific challenge with the same wallet
 
 ## Scripts
 

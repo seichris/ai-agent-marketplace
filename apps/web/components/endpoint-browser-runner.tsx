@@ -1,0 +1,426 @@
+"use client";
+
+import React from "react";
+import { LoaderCircle, RefreshCcw, TriangleAlert, Wallet } from "lucide-react";
+import type { ServiceCatalogEndpoint } from "@marketplace/shared";
+import type { WebDeploymentNetwork } from "@/lib/network";
+
+import { CopyButton } from "@/components/copy-button";
+import { Button } from "@/components/ui/button";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  createJobAccessToken,
+  createPaymentIdentifier,
+  encodeBrowserPaymentPayload,
+  formatResponseBody,
+  paymentNetworkForDeployment,
+  rawAmountToHex,
+  selectPaymentRequirement,
+  type BrowserConnectorLike,
+  type BrowserPaymentRequirement,
+  type BrowserPaymentRequired
+} from "@/lib/browser-x402";
+
+interface ExecutionResultState {
+  statusCode: number;
+  body: unknown;
+  payment?: {
+    amountRaw: string;
+    recipient: string;
+    txHash: string;
+    explorerUrl?: string | null;
+  };
+}
+
+interface JobResultState {
+  jobToken: string;
+  payerWallet: string;
+  status: string;
+  result?: unknown;
+  error?: string;
+  refund?: unknown;
+  updatedAt?: string;
+}
+
+export function EndpointBrowserRunner({
+  endpoint,
+  deploymentNetwork
+}: {
+  endpoint: ServiceCatalogEndpoint;
+  deploymentNetwork: WebDeploymentNetwork;
+}) {
+  const [requestBody, setRequestBody] = React.useState(() => JSON.stringify(endpoint.requestExample, null, 2));
+  const [pending, startTransition] = React.useTransition();
+  const [error, setError] = React.useState<string | null>(null);
+  const [result, setResult] = React.useState<ExecutionResultState | null>(null);
+  const [job, setJob] = React.useState<JobResultState | null>(null);
+  const connectorRef = React.useRef<BrowserConnectorLike | null>(null);
+
+  const apiBaseUrl = React.useMemo(() => new URL(endpoint.proxyUrl).origin, [endpoint.proxyUrl]);
+  const isPaid = endpoint.price !== "$0";
+
+  function runEndpoint() {
+    startTransition(async () => {
+      setError(null);
+
+      try {
+        const parsedBody = JSON.parse(requestBody) as unknown;
+        const connector = await ensureConnector(deploymentNetwork, connectorRef);
+        const payer = await connector.exportKeys();
+        const paymentId = createPaymentIdentifier();
+
+        const unpaidResponse = await fetch(endpoint.proxyUrl, {
+          method: endpoint.method,
+          headers: {
+            "content-type": "application/json",
+            "PAYMENT-IDENTIFIER": paymentId
+          },
+          body: JSON.stringify(parsedBody)
+        });
+
+        if (unpaidResponse.status !== 402) {
+          const body = await safeJson(unpaidResponse);
+          setResult({
+            statusCode: unpaidResponse.status,
+            body
+          });
+          if (isAsyncJob(body)) {
+            setJob({
+              jobToken: body.jobToken,
+              payerWallet: payer.address,
+              status: body.status
+            });
+          } else {
+            setJob(null);
+          }
+          return;
+        }
+
+        const paymentRequired = (await unpaidResponse.json()) as BrowserPaymentRequired;
+        const requirement = selectPaymentRequirement(paymentRequired, deploymentNetwork);
+        if (!requirement) {
+          throw new Error(`No Fast payment requirement found for ${paymentNetworkForDeployment(deploymentNetwork)}.`);
+        }
+
+        const payment = await connector.transfer({
+          recipient: requirement.payTo,
+          amount: rawAmountToHex(requirement.maxAmountRequired),
+          ...(requirement.asset ? { token: requirement.asset } : {})
+        });
+
+        const paymentPayload = encodeBrowserPaymentPayload({
+          paymentRequired,
+          requirement,
+          certificate: payment.certificate
+        });
+
+        const paidResponse = await fetch(endpoint.proxyUrl, {
+          method: endpoint.method,
+          headers: {
+            "content-type": "application/json",
+            "PAYMENT-IDENTIFIER": paymentId,
+            "PAYMENT-SIGNATURE": paymentPayload
+          },
+          body: JSON.stringify(parsedBody)
+        });
+
+        const body = await safeJson(paidResponse);
+        setResult({
+          statusCode: paidResponse.status,
+          body,
+          payment: {
+            amountRaw: requirement.maxAmountRequired,
+            recipient: requirement.payTo,
+            txHash: payment.txHash,
+            explorerUrl: payment.explorerUrl
+          }
+        });
+
+        if (isAsyncJob(body)) {
+          setJob({
+            jobToken: body.jobToken,
+            payerWallet: payer.address,
+            status: body.status
+          });
+        } else {
+          setJob(null);
+        }
+      } catch (nextError) {
+        setResult(null);
+        setJob(null);
+        setError(nextError instanceof Error ? nextError.message : "Browser execution failed.");
+      }
+    });
+  }
+
+  function refreshJob() {
+    if (!job) {
+      return;
+    }
+
+    startTransition(async () => {
+      setError(null);
+
+      try {
+        const connector = await ensureConnector(deploymentNetwork, connectorRef);
+        const payer = await connector.exportKeys();
+        if (payer.address !== job.payerWallet) {
+          throw new Error(`Job was paid by ${job.payerWallet}. Reconnect that same wallet before polling.`);
+        }
+
+        const accessToken = await createJobAccessToken({
+          apiBaseUrl,
+          wallet: payer.address,
+          jobToken: job.jobToken,
+          connector
+        });
+
+        const jobResponse = await fetch(`${apiBaseUrl}/api/jobs/${job.jobToken}`, {
+          headers: {
+            Authorization: `Bearer ${accessToken}`
+          }
+        });
+
+        if (!jobResponse.ok) {
+          throw new Error(await jobResponse.text());
+        }
+
+        const body = await safeJson(jobResponse);
+        if (!isJobStatusBody(body)) {
+          throw new Error("Unexpected job response shape.");
+        }
+
+        setJob({
+          jobToken: body.jobToken,
+          payerWallet: payer.address,
+          status: body.status,
+          result: body.result,
+          error: body.error,
+          refund: body.refund,
+          updatedAt: body.updatedAt
+        });
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : "Job refresh failed.");
+      }
+    });
+  }
+
+  return (
+    <div className="space-y-4 rounded-[24px] border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(6,9,16,0.92),rgba(7,12,22,0.88))] p-4 lg:col-span-2">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <div className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">Browser Execution</div>
+          <div className="mt-1 text-base font-semibold text-foreground">
+            {isPaid ? "Pay and run this endpoint with the Fast extension" : "Run this endpoint in the browser"}
+          </div>
+          <p className="mt-2 max-w-3xl text-sm leading-7 text-muted-foreground">
+            This sends the unpaid request first, signs a Fast payment only if the route returns `402`, and then retries
+            with the x402 proof directly from the browser wallet.
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-cyan-100">
+          <Wallet className="h-3.5 w-3.5" />
+          {paymentNetworkForDeployment(deploymentNetwork)}
+        </div>
+      </div>
+
+      <div className="space-y-3">
+        <div className="flex items-center justify-between gap-3">
+          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Request Body</div>
+          <CopyButton value={requestBody} />
+        </div>
+        <Textarea value={requestBody} onChange={(event) => setRequestBody(event.target.value)} />
+      </div>
+
+      <div className="flex flex-wrap gap-3">
+        <Button type="button" onClick={runEndpoint} disabled={pending}>
+          {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <Wallet className="h-4 w-4" />}
+          {isPaid ? "Pay and run in browser" : "Run in browser"}
+        </Button>
+        {job ? (
+          <Button type="button" variant="secondary" onClick={refreshJob} disabled={pending}>
+            {pending ? <LoaderCircle className="h-4 w-4 animate-spin" /> : <RefreshCcw className="h-4 w-4" />}
+            Refresh job
+          </Button>
+        ) : null}
+      </div>
+
+      {error ? (
+        <div className="flex items-center gap-2 rounded-[20px] border border-amber-300/20 bg-amber-200/8 px-4 py-3 text-sm text-amber-100">
+          <TriangleAlert className="h-4 w-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      ) : null}
+
+      {result ? (
+        <div className="space-y-4 rounded-[20px] border border-border/70 bg-black/20 p-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Latest Response</div>
+              <div className="mt-1 text-sm font-medium text-foreground">HTTP {result.statusCode}</div>
+            </div>
+            <CopyButton value={formatResponseBody(result.body)} />
+          </div>
+
+          {result.payment ? (
+            <div className="grid gap-3 rounded-[20px] border border-emerald-400/15 bg-emerald-400/5 p-4 sm:grid-cols-3">
+              <Detail label="Amount" value={`${formatRawAmount(result.payment.amountRaw)} ${endpoint.tokenSymbol}`} />
+              <Detail label="Recipient" value={shorten(result.payment.recipient)} />
+              <Detail label="Transaction" value={result.payment.txHash} />
+            </div>
+          ) : null}
+
+          {result.payment?.explorerUrl ? (
+            <a
+              href={result.payment.explorerUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex text-sm font-medium text-cyan-100 hover:text-cyan-50"
+            >
+              Open transaction in explorer
+            </a>
+          ) : null}
+
+          <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+            {formatResponseBody(result.body)}
+          </pre>
+        </div>
+      ) : null}
+
+      {job ? (
+        <div className="space-y-3 rounded-[20px] border border-border/70 bg-black/20 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Async Job</div>
+              <div className="mt-1 text-sm font-medium text-foreground">{job.jobToken}</div>
+            </div>
+            <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-foreground">
+              {job.status}
+            </div>
+          </div>
+          <p className="text-sm text-muted-foreground">
+            Async retrieval uses the same paying wallet to sign a job-specific challenge before polling the result.
+          </p>
+          {job.updatedAt ? <div className="text-xs text-muted-foreground">Updated: {job.updatedAt}</div> : null}
+          {job.result !== undefined ? (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Job Result</div>
+                <CopyButton value={formatResponseBody(job.result)} />
+              </div>
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+                {formatResponseBody(job.result)}
+              </pre>
+            </div>
+          ) : null}
+          {job.error ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Job Error</div>
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-amber-100">{job.error}</pre>
+            </div>
+          ) : null}
+          {job.refund !== undefined ? (
+            <div className="space-y-2">
+              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Refund</div>
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+                {formatResponseBody(job.refund)}
+              </pre>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function Detail({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className="mt-2 break-all text-sm font-medium text-foreground">{value}</div>
+    </div>
+  );
+}
+
+async function ensureConnector(
+  deploymentNetwork: WebDeploymentNetwork,
+  connectorRef: React.MutableRefObject<BrowserConnectorLike | null>
+): Promise<BrowserConnectorLike> {
+  if (connectorRef.current) {
+    return connectorRef.current;
+  }
+
+  const { FastConnector, waitForInjectedFastConnector } = await import("@fastxyz/fast-connector");
+  const injected = await waitForInjectedFastConnector(1500);
+  if (!injected) {
+    throw new Error("Fast wallet extension not found in this browser.");
+  }
+
+  const connector = FastConnector.fromInjected(injected, {
+    providerOptions: {
+      network: deploymentNetwork
+    }
+  }) as unknown as BrowserConnectorLike;
+
+  const connected = await connector.connect();
+  if (!connected) {
+    throw new Error("Wallet connection was rejected.");
+  }
+
+  if (connector.getActiveNetwork) {
+    const active = await connector.getActiveNetwork().catch(() => null);
+    if (active && !matchesDeploymentNetwork(active, deploymentNetwork)) {
+      throw new Error(`Wallet is on ${active}. Switch it to ${deploymentNetwork} for this endpoint.`);
+    }
+  }
+
+  connectorRef.current = connector;
+  return connector;
+}
+
+function matchesDeploymentNetwork(active: string, deploymentNetwork: WebDeploymentNetwork): boolean {
+  const normalized = active.trim().toLowerCase();
+
+  if (deploymentNetwork === "testnet") {
+    return normalized === "testnet" || normalized === "fast-testnet";
+  }
+
+  return normalized === "mainnet" || normalized === "fast-mainnet";
+}
+
+async function safeJson(response: Response): Promise<unknown> {
+  try {
+    return await response.json();
+  } catch {
+    return await response.text();
+  }
+}
+
+function isAsyncJob(body: unknown): body is { jobToken: string; status: string } {
+  return Boolean(
+    body &&
+      typeof body === "object" &&
+      "jobToken" in body &&
+      typeof (body as { jobToken?: unknown }).jobToken === "string" &&
+      "status" in body &&
+      typeof (body as { status?: unknown }).status === "string"
+  );
+}
+
+function isJobStatusBody(
+  body: unknown
+): body is { jobToken: string; status: string; result?: unknown; error?: string; refund?: unknown; updatedAt?: string } {
+  return isAsyncJob(body);
+}
+
+function formatRawAmount(amountRaw: string): string {
+  return (Number(amountRaw) / 1_000_000).toFixed(6).replace(/\.?0+$/, "");
+}
+
+function shorten(value: string): string {
+  if (value.length <= 18) {
+    return value;
+  }
+
+  return `${value.slice(0, 10)}...${value.slice(-8)}`;
+}

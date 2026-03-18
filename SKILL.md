@@ -12,6 +12,7 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 - the user wants to find a service or endpoint on `https://fast.8o.vc`
 - the user needs the exact request body, proxy URL, or response shape for a marketplace endpoint
 - the user wants to sign into `https://fast.8o.vc` with a Fast browser wallet
+- the user wants to pay and execute a marketplace route directly from the website with the Fast browser extension
 - the user needs to call a paid Fast-native x402 route with a local Fast wallet
 - the user needs to retrieve an async result from a previously paid job
 - the user wants to suggest a missing endpoint or a new source/webservice for providers to build
@@ -19,7 +20,6 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 ## Do not use this skill when
 
 - the user wants a direct provider integration outside the marketplace
-- the user wants a fully in-browser paid call flow; website login is supported, but paid API execution still uses the CLI or another agent wallet client
 - the task is generic web research rather than using marketplace routes
 
 ## Inputs to gather
@@ -29,7 +29,7 @@ Before acting, identify:
 - the service or domain the user wants
 - the endpoint or outcome they need
 - whether the route is free, paid, sync, or async
-- whether they want browser login only or a full paid API call
+- whether they want browser login only, browser execution, or a CLI/agent-wallet flow
 - whether they already have a funded Fast wallet
 - which Fast network the deployment is using: mainnet or testnet
 
@@ -38,11 +38,12 @@ Before acting, identify:
 1. Open the marketplace UI at `https://fast.8o.vc` and locate the relevant service.
 2. If the user wants website login, connect the Fast browser wallet from the site header and sign the website challenge.
 3. Open the service page and use the published endpoint docs, pricing, and examples.
-4. If the user is delegating the task to another agent, copy the service page's "Use this service" block or the canonical skill URL.
-5. For paid routes, send the first request without payment proof and read the `402 Payment Required` response.
-6. Pay from the funded local Fast wallet and retry the same request with the payment proof headers.
-7. If the route returns `202 Accepted`, store the `jobToken` and switch to wallet-bound retrieval.
-8. If the marketplace does not have the needed capability, submit a suggestion for an endpoint or source.
+4. If the user wants browser execution, use the endpoint's browser execution panel and let the extension pay after the first `402` response.
+5. If the user is delegating the task to another agent, copy the service page's "Use this service" block or the canonical skill URL.
+6. For paid routes outside the browser panel, send the first request without payment proof and read the `402 Payment Required` response.
+7. Pay from the funded local Fast wallet and retry the same request with the payment proof headers.
+8. If the route returns `202 Accepted`, store the `jobToken` and switch to wallet-bound retrieval.
+9. If the marketplace does not have the needed capability, submit a suggestion for an endpoint or source.
 
 ## Payment flow
 
@@ -57,7 +58,8 @@ The marketplace is Fast-native and wallet-first.
 Important constraints:
 
 - paid routes do not use long-lived API keys
-- website login uses a signed wallet challenge but does not pay for routes by itself
+- website login uses a signed wallet challenge for the site session
+- the website can also pay and execute routes directly through the Fast extension
 - wallet identity is the payer identity
 - use the same request body when retrying a paid request
 - for safe retries, keep the same payment identifier for the same normalized request only

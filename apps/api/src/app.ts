@@ -3,6 +3,9 @@ import express from "express";
 import { verifyPayment } from "@fastxyz/x402-server";
 import { z } from "zod";
 import {
+  LEGACY_PAYMENT_HEADER,
+  LEGACY_PAYMENT_IDENTIFIER_HEADER,
+  LEGACY_PAYMENT_RESPONSE_HEADER,
   buildServiceDetail,
   buildServiceSummary,
   buildLlmsTxt,
@@ -24,6 +27,10 @@ import {
   normalizeFastWalletAddress,
   normalizePaymentHeaders,
   parseBearerToken,
+  PAYMENT_IDENTIFIER_HEADER,
+  PAYMENT_REQUIRED_HEADER,
+  PAYMENT_RESPONSE_HEADER,
+  PAYMENT_SIGNATURE_HEADER,
   quotedPriceRaw,
   verifySessionToken,
   verifyWalletChallenge,
@@ -77,8 +84,41 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
   const providers = options.providers ?? createDefaultProviderRegistry();
   const baseUrl = options.baseUrl ?? "http://localhost:3000";
   const webBaseUrl = options.webBaseUrl ?? baseUrl;
+  const allowedWebOrigin = safeOrigin(webBaseUrl);
 
   app.use(express.json());
+  app.use((req, res, next) => {
+    const origin = req.header("origin");
+    if (origin && origin === allowedWebOrigin) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PATCH,OPTIONS");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        [
+          "Content-Type",
+          "Authorization",
+          PAYMENT_IDENTIFIER_HEADER,
+          PAYMENT_SIGNATURE_HEADER,
+          PAYMENT_REQUIRED_HEADER,
+          PAYMENT_RESPONSE_HEADER,
+          LEGACY_PAYMENT_HEADER,
+          LEGACY_PAYMENT_IDENTIFIER_HEADER,
+          LEGACY_PAYMENT_RESPONSE_HEADER
+        ].join(", ")
+      );
+      res.setHeader(
+        "Access-Control-Expose-Headers",
+        [PAYMENT_REQUIRED_HEADER, PAYMENT_RESPONSE_HEADER, LEGACY_PAYMENT_RESPONSE_HEADER].join(", ")
+      );
+    }
+
+    if (req.method === "OPTIONS") {
+      return res.status(204).end();
+    }
+
+    return next();
+  });
 
   app.get("/openapi.json", (_req, res) => {
     res.json(buildOpenApiDocument(baseUrl));
@@ -611,4 +651,12 @@ export function createX402FacilitatorClient(url: string): FacilitatorClient {
       );
     }
   };
+}
+
+function safeOrigin(value: string): string {
+  try {
+    return new URL(value).origin;
+  } catch {
+    return value;
+  }
 }

@@ -2,6 +2,7 @@
 
 import React from "react";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -16,9 +17,12 @@ vi.mock("next/link", () => ({
 }));
 
 describe("ServicePage", () => {
-  it("renders service stats, prompt copy, and endpoint examples", () => {
+  it("renders service stats, prompt copy, and endpoint examples", async () => {
+    const user = userEvent.setup();
+
     render(
       <ServicePage
+        deploymentNetwork="mainnet"
         service={{
           summary: {
             slug: "mock-research-signals",
@@ -61,5 +65,7 @@ describe("ServicePage", () => {
     expect(screen.getByText("A mock service for wallet and x402 smoke tests.")).toBeTruthy();
     expect(screen.getByText("Available Endpoints (1)")).toBeTruthy();
     expect(screen.getByText("Open canonical SKILL.md")).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: /quick insight/i }));
+    expect(screen.getByText("Pay and run this endpoint with the Fast extension")).toBeTruthy();
   });
 });

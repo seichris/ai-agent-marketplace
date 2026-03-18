@@ -119,6 +119,21 @@ describe("marketplace api", () => {
     expect(response.body.accepts[0].network).toBe("fast-mainnet");
   });
 
+  it("allows browser CORS requests from the configured web origin", async () => {
+    const { app } = await createTestApp();
+
+    const response = await request(app)
+      .options("/api/mock/quick-insight")
+      .set("Origin", "https://fast.8o.vc")
+      .set("Access-Control-Request-Method", "POST")
+      .set("Access-Control-Request-Headers", "content-type,payment-identifier,payment-signature");
+
+    expect(response.status).toBe(204);
+    expect(response.headers["access-control-allow-origin"]).toBe("https://fast.8o.vc");
+    expect(response.headers["access-control-allow-headers"]).toContain("PAYMENT-IDENTIFIER");
+    expect(response.headers["access-control-expose-headers"]).toContain("PAYMENT-REQUIRED");
+  });
+
   it("accepts legacy X-PAYMENT on a sync route", async () => {
     const { app, store } = await createTestApp();
 

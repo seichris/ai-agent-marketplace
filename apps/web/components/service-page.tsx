@@ -5,15 +5,23 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { ArrowLeftRight, ArrowUpRight, Command, DatabaseZap, Sparkle } from "lucide-react";
 import type { ServiceDetail } from "@marketplace/shared";
+import type { WebDeploymentNetwork } from "@/lib/network";
 
 import { CopyButton } from "@/components/copy-button";
+import { EndpointBrowserRunner } from "@/components/endpoint-browser-runner";
 import { VolumeChart } from "@/components/volume-chart";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-export function ServicePage({ service }: { service: ServiceDetail }) {
+export function ServicePage({
+  service,
+  deploymentNetwork
+}: {
+  service: ServiceDetail;
+  deploymentNetwork: WebDeploymentNetwork;
+}) {
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 md:py-12">
       <section className="grid gap-6 rounded-[36px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_24%),radial-gradient(circle_at_85%_20%,rgba(52,211,153,0.12),transparent_24%),linear-gradient(160deg,rgba(10,14,26,0.94),rgba(9,12,20,0.96))] p-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,1)] lg:grid-cols-[1.3fr_0.9fr]">
@@ -160,6 +168,7 @@ export function ServicePage({ service }: { service: ServiceDetail }) {
 
                       <ExampleBlock label="Request Example" value={JSON.stringify(endpoint.requestExample, null, 2)} />
                       <ExampleBlock label="Response Example" value={JSON.stringify(endpoint.responseExample, null, 2)} />
+                      <EndpointBrowserRunner endpoint={endpoint} deploymentNetwork={deploymentNetwork} />
                     </div>
                   </AccordionContent>
                 </AccordionItem>

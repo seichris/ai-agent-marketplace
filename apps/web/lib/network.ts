@@ -3,16 +3,22 @@ export type WebDeploymentNetwork = "mainnet" | "testnet";
 export function resolveWebDeploymentNetwork(input: string | undefined | null): {
   deploymentNetwork: WebDeploymentNetwork;
   networkLabel: string;
+  paymentNetwork: "fast-mainnet" | "fast-testnet";
+  tokenSymbol: "fastUSDC" | "testUSDC";
 } {
   if (input === "testnet") {
     return {
       deploymentNetwork: "testnet",
-      networkLabel: "Testnet"
+      networkLabel: "Testnet",
+      paymentNetwork: "fast-testnet",
+      tokenSymbol: "testUSDC"
     };
   }
 
   return {
     deploymentNetwork: "mainnet",
-    networkLabel: "Mainnet"
+    networkLabel: "Mainnet",
+    paymentNetwork: "fast-mainnet",
+    tokenSymbol: "fastUSDC"
   };
 }
