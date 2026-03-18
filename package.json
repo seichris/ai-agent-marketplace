@@ -7,12 +7,18 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "build:runtime": "tsup --config tsup.config.ts",
+    "build": "npm run typecheck && npm run build:runtime",
     "test": "vitest run",
     "dev:api": "tsx apps/api/src/index.ts",
     "dev:facilitator": "tsx apps/facilitator/src/index.ts",
     "dev:worker": "tsx apps/worker/src/index.ts",
-    "cli": "tsx packages/cli/src/index.ts"
+    "cli": "tsx packages/cli/src/index.ts",
+    "start:api": "node dist/apps/api/index.js",
+    "start:facilitator": "node dist/apps/facilitator/index.js",
+    "start:worker": "node dist/apps/worker/index.js",
+    "start:cli": "node dist/packages/cli/index.js"
   },
   "dependencies": {
     "@noble/ed25519": "^2.3.0",
@@ -33,6 +39,7 @@
     "@types/pg": "^8.15.5",
     "@types/supertest": "^6.0.3",
     "supertest": "^7.1.1",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.6",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4"

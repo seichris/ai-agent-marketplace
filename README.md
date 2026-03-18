@@ -68,11 +68,82 @@ npm run cli -- wallet address
 npm run cli -- invoke mock quick-insight --body '{"query":"alpha"}'
 ```
 
+7. Build runtime artifacts:
+
+```bash
+npm run build
+```
+
+8. Start production-style processes from `dist`:
+
+```bash
+npm run start:api
+npm run start:facilitator
+npm run start:worker
+```
+
+## Docker Deployment
+
+Use the repo-root Docker context with one Dockerfile per service:
+
+- API: `docker/api.Dockerfile`
+- Facilitator: `docker/facilitator.Dockerfile`
+- Worker: `docker/worker.Dockerfile`
+
+Coolify setup:
+
+- API service
+  - Dockerfile: `docker/api.Dockerfile`
+  - Port: `3000`
+  - Domain: your public API domain
+  - Health check: `/openapi.json`
+- Facilitator service
+  - Dockerfile: `docker/facilitator.Dockerfile`
+  - Port: `4020`
+  - Domain: internal or public facilitator domain
+  - Health check: `/supported`
+- Worker service
+  - Dockerfile: `docker/worker.Dockerfile`
+  - No public domain
+  - No HTTP health check
+
+Required API environment:
+
+```bash
+DATABASE_URL=postgres://...
+MARKETPLACE_TREASURY_ADDRESS=fast1...
+MARKETPLACE_FACILITATOR_URL=https://fastfacilitator.example.com
+MARKETPLACE_SESSION_SECRET=change-me
+MARKETPLACE_BASE_URL=https://fastapi.example.com
+PORT=3000
+```
+
+Required worker environment:
+
+```bash
+DATABASE_URL=postgres://...
+MARKETPLACE_TREASURY_PRIVATE_KEY=<fast-ed25519-private-key-hex>
+FAST_RPC_URL=https://api.fast.xyz/proxy
+WORKER_POLL_INTERVAL_MS=5000
+```
+
+Facilitator environment:
+
+```bash
+FACILITATOR_PORT=4020
+FACILITATOR_FAST_RPC_URL=https://api.fast.xyz/proxy
+```
+
 ## Scripts
 
-- `npm run build`: typecheck the workspace
+- `npm run typecheck`: typecheck the workspace
+- `npm run build`: typecheck and emit runtime bundles into `dist`
+- `npm run build:runtime`: emit runtime bundles into `dist`
 - `npm run test`: run unit and integration tests
 - `npm run dev:api`: run the API with `tsx`
 - `npm run dev:facilitator`: run the facilitator with `tsx`
 - `npm run dev:worker`: run the worker with `tsx`
+- `npm run start:api`: run the built API bundle
+- `npm run start:facilitator`: run the built facilitator bundle
+- `npm run start:worker`: run the built worker bundle
 - `npm run cli -- ...`: run the buyer CLI

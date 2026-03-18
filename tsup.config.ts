@@ -1,0 +1,19 @@
+import { defineConfig } from "tsup";
+
+export default defineConfig({
+  entry: {
+    "apps/api/index": "apps/api/src/index.ts",
+    "apps/facilitator/index": "apps/facilitator/src/index.ts",
+    "apps/worker/index": "apps/worker/src/index.ts",
+    "packages/cli/index": "packages/cli/src/index.ts"
+  },
+  outDir: "dist",
+  format: ["esm"],
+  platform: "node",
+  target: "node20",
+  sourcemap: true,
+  splitting: false,
+  clean: true,
+  dts: false,
+  noExternal: [/^@marketplace\//]
+});
