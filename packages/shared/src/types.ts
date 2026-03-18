@@ -4,6 +4,8 @@ export type RouteMode = "sync" | "async";
 export type ResourceType = "job";
 export type JobStatus = "pending" | "completed" | "failed";
 export type RefundStatus = "not_required" | "pending" | "sent" | "failed";
+export type SuggestionType = "endpoint" | "source";
+export type SuggestionStatus = "submitted" | "reviewing" | "accepted" | "rejected" | "shipped";
 
 export interface RoutePayoutConfig {
   providerAccountId: string;
@@ -36,8 +38,105 @@ export interface MarketplaceRoute<
   title: string;
   description: string;
   payout: RoutePayoutConfig;
+  requestExample: unknown;
+  responseExample: unknown;
+  usageNotes?: string;
   inputSchema: TInput;
   outputSchema: TOutput;
+}
+
+export interface ServiceDefinition {
+  slug: string;
+  name: string;
+  ownerName: string;
+  tagline: string;
+  about: string;
+  categories: string[];
+  routeIds: string[];
+  featured: boolean;
+  promptIntro: string;
+  setupInstructions: string[];
+}
+
+export interface ServiceAnalyticsPoint {
+  date: string;
+  amountRaw: string;
+}
+
+export interface ServiceAnalytics {
+  totalCalls: number;
+  revenueRaw: string;
+  successRate30d: number;
+  volume30d: ServiceAnalyticsPoint[];
+}
+
+export interface ServiceSummary {
+  slug: string;
+  name: string;
+  ownerName: string;
+  tagline: string;
+  categories: string[];
+  priceRange: string;
+  endpointCount: number;
+  totalCalls: number;
+  revenue: string;
+  successRate30d: number;
+  volume30d: Array<{
+    date: string;
+    amount: string;
+  }>;
+}
+
+export interface ServiceCatalogEndpoint {
+  routeId: string;
+  title: string;
+  description: string;
+  price: string;
+  mode: RouteMode;
+  method: "POST";
+  path: string;
+  proxyUrl: string;
+  requestExample: unknown;
+  responseExample: unknown;
+  usageNotes?: string;
+}
+
+export interface ServiceDetail {
+  summary: ServiceSummary;
+  about: string;
+  useThisServicePrompt: string;
+  skillUrl: string;
+  endpoints: ServiceCatalogEndpoint[];
+}
+
+export interface SuggestionRecord {
+  id: string;
+  type: SuggestionType;
+  serviceSlug: string | null;
+  title: string;
+  description: string;
+  sourceUrl: string | null;
+  requesterName: string | null;
+  requesterEmail: string | null;
+  status: SuggestionStatus;
+  internalNotes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreateSuggestionInput {
+  type: SuggestionType;
+  serviceSlug?: string | null;
+  title: string;
+  description: string;
+  sourceUrl?: string | null;
+  requesterName?: string | null;
+  requesterEmail?: string | null;
+}
+
+export interface UpdateSuggestionInput {
+  status?: SuggestionStatus;
+  internalNotes?: string | null;
 }
 
 export interface SyncExecuteResult {
@@ -255,6 +354,10 @@ export interface MarketplaceStore {
   markRefundSent(refundId: string, txHash: string): Promise<RefundRecord>;
   markRefundFailed(refundId: string, errorMessage: string): Promise<RefundRecord>;
   getRefundByJobToken(jobToken: string): Promise<RefundRecord | null>;
+  getServiceAnalytics(routeIds: string[]): Promise<ServiceAnalytics>;
+  createSuggestion(input: CreateSuggestionInput): Promise<SuggestionRecord>;
+  listSuggestions(filter?: { status?: SuggestionStatus }): Promise<SuggestionRecord[]>;
+  updateSuggestion(id: string, input: UpdateSuggestionInput): Promise<SuggestionRecord | null>;
 }
 
 export interface ChallengePayload {

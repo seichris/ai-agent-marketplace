@@ -34,6 +34,7 @@ async function createTestApp() {
     store,
     payTo: buyer.address,
     sessionSecret: "test-session-secret",
+    adminToken: "test-admin-token",
     facilitatorClient: {
       async verify() {
         return {
@@ -42,7 +43,8 @@ async function createTestApp() {
           network: "fast-mainnet"
         };
       }
-    }
+    },
+    webBaseUrl: "https://fast.8o.vc"
   });
 
   return {
@@ -53,6 +55,58 @@ async function createTestApp() {
 }
 
 describe("marketplace api", () => {
+  it("returns catalog services and service details with generated prompts", async () => {
+    const { app } = await createTestApp();
+
+    const listResponse = await request(app).get("/catalog/services");
+    expect(listResponse.status).toBe(200);
+    expect(listResponse.body.services).toHaveLength(1);
+    expect(listResponse.body.services[0].slug).toBe("mock-research-signals");
+
+    const detailResponse = await request(app).get("/catalog/services/mock-research-signals");
+    expect(detailResponse.status).toBe(200);
+    expect(detailResponse.body.summary.endpointCount).toBe(2);
+    expect(detailResponse.body.skillUrl).toBe("https://fast.8o.vc/skill.md");
+    expect(detailResponse.body.useThisServicePrompt).toContain("https://fast.8o.vc/skill.md");
+  });
+
+  it("accepts public suggestions and requires an admin token for internal review", async () => {
+    const { app } = await createTestApp();
+
+    const created = await request(app)
+      .post("/catalog/suggestions")
+      .send({
+        type: "endpoint",
+        serviceSlug: "mock-research-signals",
+        title: "Add a structured watchlist endpoint",
+        description: "Expose a watchlist-friendly endpoint that returns a ranked signal feed.",
+        requesterEmail: "builder@example.com"
+      });
+
+    expect(created.status).toBe(201);
+    expect(created.body.status).toBe("submitted");
+
+    const unauthorized = await request(app).get("/internal/suggestions");
+    expect(unauthorized.status).toBe(401);
+
+    const listed = await request(app)
+      .get("/internal/suggestions")
+      .set("Authorization", "Bearer test-admin-token");
+    expect(listed.status).toBe(200);
+    expect(listed.body.suggestions).toHaveLength(1);
+
+    const patched = await request(app)
+      .patch(`/internal/suggestions/${created.body.id}`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        status: "reviewing",
+        internalNotes: "Looks viable for the mock catalog."
+      });
+
+    expect(patched.status).toBe(200);
+    expect(patched.body.status).toBe("reviewing");
+  });
+
   it("returns 402 and payment requirements for unpaid routes", async () => {
     const { app } = await createTestApp();
 

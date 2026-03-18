@@ -4,13 +4,18 @@ import { Pool } from "pg";
 
 import type {
   AccessGrantRecord,
+  CreateSuggestionInput,
   IdempotencyRecord,
   JobRecord,
   MarketplaceStore,
   ProviderAttemptRecord,
   RefundRecord,
   SaveAsyncAcceptanceInput,
-  SaveSyncIdempotencyInput
+  SaveSyncIdempotencyInput,
+  ServiceAnalytics,
+  SuggestionRecord,
+  SuggestionStatus,
+  UpdateSuggestionInput
 } from "./types.js";
 
 function timestamp(): string {
@@ -27,6 +32,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
   private readonly accessGrants = new Map<string, AccessGrantRecord>();
   private readonly refundsById = new Map<string, RefundRecord>();
   private readonly refundsByJobToken = new Map<string, RefundRecord>();
+  private readonly suggestionsById = new Map<string, SuggestionRecord>();
   private readonly attempts: ProviderAttemptRecord[] = [];
 
   async ensureSchema(): Promise<void> {}
@@ -329,6 +335,60 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
   async getRefundByJobToken(jobToken: string): Promise<RefundRecord | null> {
     return clone(this.refundsByJobToken.get(jobToken) ?? null);
   }
+
+  async getServiceAnalytics(routeIds: string[]): Promise<ServiceAnalytics> {
+    return computeServiceAnalytics({
+      routeIds,
+      idempotencyRecords: Array.from(this.idempotencyByPaymentId.values()),
+      jobs: Array.from(this.jobsByToken.values())
+    });
+  }
+
+  async createSuggestion(input: CreateSuggestionInput): Promise<SuggestionRecord> {
+    const now = timestamp();
+    const record: SuggestionRecord = {
+      id: randomUUID(),
+      type: input.type,
+      serviceSlug: input.serviceSlug ?? null,
+      title: input.title,
+      description: input.description,
+      sourceUrl: input.sourceUrl ?? null,
+      requesterName: input.requesterName ?? null,
+      requesterEmail: input.requesterEmail ?? null,
+      status: "submitted",
+      internalNotes: null,
+      createdAt: now,
+      updatedAt: now
+    };
+
+    this.suggestionsById.set(record.id, record);
+    return clone(record);
+  }
+
+  async listSuggestions(filter?: { status?: SuggestionStatus }): Promise<SuggestionRecord[]> {
+    const suggestions = Array.from(this.suggestionsById.values())
+      .filter((suggestion) => !filter?.status || suggestion.status === filter.status)
+      .sort((left, right) => right.createdAt.localeCompare(left.createdAt));
+
+    return clone(suggestions);
+  }
+
+  async updateSuggestion(id: string, input: UpdateSuggestionInput): Promise<SuggestionRecord | null> {
+    const existing = this.suggestionsById.get(id);
+    if (!existing) {
+      return null;
+    }
+
+    const updated: SuggestionRecord = {
+      ...existing,
+      status: input.status ?? existing.status,
+      internalNotes: input.internalNotes === undefined ? existing.internalNotes : input.internalNotes,
+      updatedAt: timestamp()
+    };
+
+    this.suggestionsById.set(id, updated);
+    return clone(updated);
+  }
 }
 
 export class PostgresMarketplaceStore implements MarketplaceStore {
@@ -407,6 +467,21 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         status TEXT NOT NULL,
         tx_hash TEXT,
         error_message TEXT,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+      );
+
+      CREATE TABLE IF NOT EXISTS service_suggestions (
+        id TEXT PRIMARY KEY,
+        type TEXT NOT NULL,
+        service_slug TEXT,
+        title TEXT NOT NULL,
+        description TEXT NOT NULL,
+        source_url TEXT,
+        requester_name TEXT,
+        requester_email TEXT,
+        status TEXT NOT NULL,
+        internal_notes TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
@@ -723,6 +798,93 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     const result = await this.pool.query("SELECT * FROM refunds WHERE job_token = $1", [jobToken]);
     return result.rowCount ? mapRefundRow(result.rows[0]) : null;
   }
+
+  async getServiceAnalytics(routeIds: string[]): Promise<ServiceAnalytics> {
+    const [idempotencyResult, jobsResult] = await Promise.all([
+      this.pool.query(
+        `
+        SELECT * FROM idempotency_records
+        WHERE route_id = ANY($1::text[])
+        `,
+        [routeIds]
+      ),
+      this.pool.query(
+        `
+        SELECT * FROM jobs
+        WHERE route_id = ANY($1::text[])
+        `,
+        [routeIds]
+      )
+    ]);
+
+    return computeServiceAnalytics({
+      routeIds,
+      idempotencyRecords: idempotencyResult.rows.map(mapIdempotencyRow),
+      jobs: jobsResult.rows.map(mapJobRow)
+    });
+  }
+
+  async createSuggestion(input: CreateSuggestionInput): Promise<SuggestionRecord> {
+    const result = await this.pool.query(
+      `
+      INSERT INTO service_suggestions (
+        id, type, service_slug, title, description, source_url, requester_name, requester_email, status, internal_notes
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, 'submitted', NULL)
+      RETURNING *
+      `,
+      [
+        randomUUID(),
+        input.type,
+        input.serviceSlug ?? null,
+        input.title,
+        input.description,
+        input.sourceUrl ?? null,
+        input.requesterName ?? null,
+        input.requesterEmail ?? null
+      ]
+    );
+
+    return mapSuggestionRow(result.rows[0]);
+  }
+
+  async listSuggestions(filter?: { status?: SuggestionStatus }): Promise<SuggestionRecord[]> {
+    const hasStatus = Boolean(filter?.status);
+    const result = await this.pool.query(
+      `
+      SELECT * FROM service_suggestions
+      WHERE ($1::text IS NULL OR status = $1)
+      ORDER BY created_at DESC
+      `,
+      [hasStatus ? filter?.status ?? null : null]
+    );
+
+    return result.rows.map(mapSuggestionRow);
+  }
+
+  async updateSuggestion(id: string, input: UpdateSuggestionInput): Promise<SuggestionRecord | null> {
+    const result = await this.pool.query(
+      `
+      UPDATE service_suggestions
+      SET
+        status = COALESCE($2, status),
+        internal_notes = CASE
+          WHEN $3::boolean THEN $4
+          ELSE internal_notes
+        END,
+        updated_at = NOW()
+      WHERE id = $1
+      RETURNING *
+      `,
+      [
+        id,
+        input.status ?? null,
+        input.internalNotes !== undefined,
+        input.internalNotes ?? null
+      ]
+    );
+
+    return result.rowCount ? mapSuggestionRow(result.rows[0]) : null;
+  }
 }
 
 function mapIdempotencyRow(row: Record<string, unknown>): IdempotencyRecord {
@@ -806,5 +968,91 @@ function mapRefundRow(row: Record<string, unknown>): RefundRecord {
     errorMessage: (row.error_message as string | null) ?? null,
     createdAt: new Date(row.created_at as string | Date).toISOString(),
     updatedAt: new Date(row.updated_at as string | Date).toISOString()
+  };
+}
+
+function mapSuggestionRow(row: Record<string, unknown>): SuggestionRecord {
+  return {
+    id: row.id as string,
+    type: row.type as SuggestionRecord["type"],
+    serviceSlug: (row.service_slug as string | null) ?? null,
+    title: row.title as string,
+    description: row.description as string,
+    sourceUrl: (row.source_url as string | null) ?? null,
+    requesterName: (row.requester_name as string | null) ?? null,
+    requesterEmail: (row.requester_email as string | null) ?? null,
+    status: row.status as SuggestionRecord["status"],
+    internalNotes: (row.internal_notes as string | null) ?? null,
+    createdAt: new Date(row.created_at as string | Date).toISOString(),
+    updatedAt: new Date(row.updated_at as string | Date).toISOString()
+  };
+}
+
+function computeServiceAnalytics(input: {
+  routeIds: string[];
+  idempotencyRecords: IdempotencyRecord[];
+  jobs: JobRecord[];
+}): ServiceAnalytics {
+  const routeIds = new Set(input.routeIds);
+  const acceptedCalls = input.idempotencyRecords.filter((record) => routeIds.has(record.routeId));
+  const jobs = input.jobs.filter((job) => routeIds.has(job.routeId));
+  const windowStart = new Date(Date.now() - 29 * 24 * 60 * 60 * 1000);
+  const volumeMap = new Map<string, bigint>();
+
+  for (let offset = 29; offset >= 0; offset -= 1) {
+    const date = new Date(Date.now() - offset * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    volumeMap.set(date, 0n);
+  }
+
+  let resolvedCalls30d = 0;
+  let successfulCalls30d = 0;
+  let revenueRaw = 0n;
+
+  for (const record of acceptedCalls) {
+    const createdAt = new Date(record.createdAt);
+    if (createdAt >= windowStart) {
+      const dateKey = createdAt.toISOString().slice(0, 10);
+      volumeMap.set(dateKey, (volumeMap.get(dateKey) ?? 0n) + BigInt(record.quotedPrice));
+    }
+
+    if (record.responseKind === "sync") {
+      const wasSuccessful = record.responseStatusCode >= 200 && record.responseStatusCode < 400;
+      if (wasSuccessful) {
+        revenueRaw += BigInt(record.payoutSplit.providerAmount);
+      }
+
+      if (createdAt >= windowStart) {
+        resolvedCalls30d += 1;
+        if (wasSuccessful) {
+          successfulCalls30d += 1;
+        }
+      }
+    }
+  }
+
+  for (const job of jobs) {
+    const createdAt = new Date(job.createdAt);
+    if (job.status === "completed") {
+      revenueRaw += BigInt(job.payoutSplit.providerAmount);
+    }
+
+    if (createdAt < windowStart || job.status === "pending") {
+      continue;
+    }
+
+    resolvedCalls30d += 1;
+    if (job.status === "completed") {
+      successfulCalls30d += 1;
+    }
+  }
+
+  return {
+    totalCalls: acceptedCalls.length,
+    revenueRaw: revenueRaw.toString(),
+    successRate30d: resolvedCalls30d === 0 ? 0 : (successfulCalls30d / resolvedCalls30d) * 100,
+    volume30d: Array.from(volumeMap.entries()).map(([date, amountRaw]) => ({
+      date,
+      amountRaw: amountRaw.toString()
+    }))
   };
 }

@@ -1,7 +1,10 @@
 import type { Express, Request, Response } from "express";
 import express from "express";
 import { verifyPayment } from "@fastxyz/x402-server";
+import { z } from "zod";
 import {
+  buildServiceDetail,
+  buildServiceSummary,
   buildLlmsTxt,
   buildMarketplaceCatalog,
   buildOpenApiDocument,
@@ -10,6 +13,8 @@ import {
   buildPaymentRequirementForRoute,
   buildPaymentResponseHeaders,
   buildPayoutSplit,
+  getServiceDefinition,
+  listServiceDefinitions,
   createChallenge,
   createOpaqueToken,
   createSessionToken,
@@ -33,15 +38,45 @@ export interface MarketplaceApiOptions {
   store: MarketplaceStore;
   payTo: string;
   sessionSecret: string;
+  adminToken: string;
   facilitatorClient: FacilitatorClient;
   providers?: ProviderRegistry;
   baseUrl?: string;
+  webBaseUrl?: string;
 }
+
+const suggestionCreateSchema = z
+  .object({
+    type: z.enum(["endpoint", "source"]),
+    serviceSlug: z.string().min(1).optional().nullable(),
+    title: z.string().min(3).max(160),
+    description: z.string().min(10).max(4_000),
+    sourceUrl: z.string().url().optional().nullable(),
+    requesterName: z.string().min(1).max(120).optional().nullable(),
+    requesterEmail: z.string().email().optional().nullable()
+  })
+  .superRefine((value, ctx) => {
+    if (value.type === "endpoint" && !value.serviceSlug) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "serviceSlug is required when type=endpoint.",
+        path: ["serviceSlug"]
+      });
+    }
+  });
+
+const suggestionStatusSchema = z.enum(["submitted", "reviewing", "accepted", "rejected", "shipped"]);
+
+const suggestionUpdateSchema = z.object({
+  status: suggestionStatusSchema.optional(),
+  internalNotes: z.string().max(4_000).nullable().optional()
+});
 
 export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
   const app = express();
   const providers = options.providers ?? createDefaultProviderRegistry();
   const baseUrl = options.baseUrl ?? "http://localhost:3000";
+  const webBaseUrl = options.webBaseUrl ?? baseUrl;
 
   app.use(express.json());
 
@@ -55,6 +90,91 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
 
   app.get("/.well-known/marketplace.json", (_req, res) => {
     res.json(buildMarketplaceCatalog(baseUrl));
+  });
+
+  app.get("/catalog/services", async (_req, res) => {
+    const services = await Promise.all(
+      listServiceDefinitions().map(async (service) =>
+        buildServiceSummary({
+          service,
+          analytics: await options.store.getServiceAnalytics(service.routeIds)
+        })
+      )
+    );
+
+    return res.json({ services });
+  });
+
+  app.get("/catalog/services/:slug", async (req, res) => {
+    const service = getServiceDefinition(req.params.slug);
+    if (!service) {
+      return res.status(404).json({ error: "Service not found." });
+    }
+
+    const detail = buildServiceDetail({
+      service,
+      analytics: await options.store.getServiceAnalytics(service.routeIds),
+      apiBaseUrl: baseUrl,
+      webBaseUrl
+    });
+
+    return res.json(detail);
+  });
+
+  app.post("/catalog/suggestions", async (req, res) => {
+    const parsed = suggestionCreateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Suggestion validation failed.",
+        issues: parsed.error.issues
+      });
+    }
+
+    if (parsed.data.serviceSlug && !getServiceDefinition(parsed.data.serviceSlug)) {
+      return res.status(400).json({ error: "Unknown serviceSlug." });
+    }
+
+    const suggestion = await options.store.createSuggestion(parsed.data);
+    return res.status(201).json(suggestion);
+  });
+
+  app.get("/internal/suggestions", async (req, res) => {
+    if (!requireAdminToken(req, res, options.adminToken)) {
+      return;
+    }
+
+    const rawStatus = typeof req.query.status === "string" ? req.query.status : undefined;
+    const parsedStatus = rawStatus ? suggestionStatusSchema.safeParse(rawStatus) : null;
+    if (parsedStatus && !parsedStatus.success) {
+      return res.status(400).json({ error: "Invalid status filter." });
+    }
+
+    const suggestions = await options.store.listSuggestions({
+      status: parsedStatus?.success ? parsedStatus.data : undefined
+    });
+
+    return res.json({ suggestions });
+  });
+
+  app.patch("/internal/suggestions/:id", async (req, res) => {
+    if (!requireAdminToken(req, res, options.adminToken)) {
+      return;
+    }
+
+    const parsed = suggestionUpdateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({
+        error: "Suggestion update validation failed.",
+        issues: parsed.error.issues
+      });
+    }
+
+    const updated = await options.store.updateSuggestion(req.params.id, parsed.data);
+    if (!updated) {
+      return res.status(404).json({ error: "Suggestion not found." });
+    }
+
+    return res.json(updated);
   });
 
   app.post("/auth/challenge", async (req, res) => {
@@ -383,6 +503,16 @@ function buildJobResponse(job: JobRecord, refund: Awaited<ReturnType<Marketplace
       : undefined,
     updatedAt: job.updatedAt
   };
+}
+
+function requireAdminToken(req: Request, res: Response, adminToken: string): boolean {
+  const token = parseBearerToken(req.header("authorization"));
+  if (!token || token !== adminToken) {
+    res.status(401).json({ error: "Missing or invalid admin token." });
+    return false;
+  }
+
+  return true;
 }
 
 export function createX402FacilitatorClient(url: string): FacilitatorClient {

@@ -2,6 +2,9 @@ node_modules
 .DS_Store
 coverage
 dist
+.next
+playwright-report
+test-results
 .env
 .env.local
 *.log

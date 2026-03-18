@@ -1,5 +1,6 @@
 export * from "./amounts.js";
 export * from "./auth.js";
+export * from "./catalog.js";
 export * from "./constants.js";
 export * from "./docs.js";
 export * from "./hashing.js";
@@ -7,5 +8,6 @@ export * from "./mock-provider.js";
 export * from "./payment.js";
 export * from "./payout.js";
 export * from "./routes.js";
+export * from "./services.js";
 export * from "./store.js";
 export * from "./types.js";

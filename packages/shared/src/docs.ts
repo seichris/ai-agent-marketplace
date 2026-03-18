@@ -1,5 +1,6 @@
 import { zodToJsonSchema } from "zod-to-json-schema";
 
+import { buildServiceSummary, getRoutesForService } from "./catalog.js";
 import {
   MARKETPLACE_NAME,
   MARKETPLACE_VERSION,
@@ -8,6 +9,7 @@ import {
   PAYMENT_RESPONSE_HEADER,
   PAYMENT_SIGNATURE_HEADER
 } from "./constants.js";
+import { listServiceDefinitions } from "./services.js";
 import { marketplaceRoutes } from "./routes.js";
 
 export function buildOpenApiDocument(baseUrl = "http://localhost:3000") {
@@ -59,6 +61,47 @@ export function buildOpenApiDocument(baseUrl = "http://localhost:3000") {
           "200": { description: "Job status or result." },
           "401": { description: "Missing or invalid session token." }
         }
+      }
+    },
+    "/catalog/services": {
+      get: {
+        summary: "List marketplace services with live stats."
+      }
+    },
+    "/catalog/services/{slug}": {
+      get: {
+        summary: "Get one marketplace service with endpoint docs and generated usage instructions.",
+        parameters: [
+          {
+            in: "path",
+            name: "slug",
+            required: true,
+            schema: { type: "string" }
+          }
+        ]
+      }
+    },
+    "/catalog/suggestions": {
+      post: {
+        summary: "Submit a new endpoint or source suggestion for the marketplace."
+      }
+    },
+    "/internal/suggestions": {
+      get: {
+        summary: "List private marketplace suggestions for operator review."
+      }
+    },
+    "/internal/suggestions/{id}": {
+      patch: {
+        summary: "Update a suggestion status or internal notes.",
+        parameters: [
+          {
+            in: "path",
+            name: "id",
+            required: true,
+            schema: { type: "string" }
+          }
+        ]
       }
     },
     "/openapi.json": {
@@ -154,12 +197,38 @@ export function buildLlmsTxt(baseUrl = "http://localhost:3000"): string {
     "Fast-only x402 paid API marketplace.",
     "",
     `Base URL: ${baseUrl}`,
+    `Marketplace catalog: ${baseUrl}/catalog/services`,
     "Payment protocol: x402 over HTTP",
     `Payment headers: ${PAYMENT_REQUIRED_HEADER}, ${PAYMENT_SIGNATURE_HEADER}, ${PAYMENT_RESPONSE_HEADER}`,
     "Repeat retrieval auth: wallet challenge session",
+    "Marketplace skill: serve from the public web app at /skill.md",
     "",
-    "## Routes"
+    "## Services"
   ];
+
+  for (const service of listServiceDefinitions()) {
+    const routes = getRoutesForService(service);
+    const summary = buildServiceSummary({
+      service,
+      analytics: {
+        totalCalls: 0,
+        revenueRaw: "0",
+        successRate30d: 0,
+        volume30d: []
+      }
+    });
+
+    lines.push(
+      `- ${service.name}`,
+      `  owner: ${service.ownerName}`,
+      `  slug: ${service.slug}`,
+      `  priceRange: ${summary.priceRange}`,
+      `  endpointCount: ${routes.length}`,
+      `  categories: ${service.categories.join(", ")}`
+    );
+  }
+
+  lines.push("", "## Routes");
 
   for (const route of marketplaceRoutes) {
     lines.push(
@@ -196,6 +265,13 @@ export function buildMarketplaceCatalog(baseUrl = "http://localhost:3000") {
       challengeEndpoint: "/auth/challenge",
       sessionEndpoint: "/auth/session"
     },
+    services: listServiceDefinitions().map((service) => ({
+      slug: service.slug,
+      name: service.name,
+      ownerName: service.ownerName,
+      categories: service.categories,
+      routeIds: service.routeIds
+    })),
     routes: marketplaceRoutes.map((route) => ({
       routeId: route.routeId,
       provider: route.provider,

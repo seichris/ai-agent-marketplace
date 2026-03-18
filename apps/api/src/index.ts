@@ -9,7 +9,9 @@ const databaseUrl = process.env.DATABASE_URL;
 const payTo = process.env.MARKETPLACE_TREASURY_ADDRESS;
 const facilitatorUrl = process.env.MARKETPLACE_FACILITATOR_URL ?? "http://localhost:4020";
 const sessionSecret = process.env.MARKETPLACE_SESSION_SECRET ?? "development-marketplace-secret";
+const adminToken = process.env.MARKETPLACE_ADMIN_TOKEN;
 const baseUrl = process.env.MARKETPLACE_BASE_URL ?? `http://localhost:${port}`;
+const webBaseUrl = process.env.MARKETPLACE_WEB_BASE_URL ?? baseUrl;
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -17,6 +19,10 @@ if (!databaseUrl) {
 
 if (!payTo) {
   throw new Error("MARKETPLACE_TREASURY_ADDRESS is required.");
+}
+
+if (!adminToken) {
+  throw new Error("MARKETPLACE_ADMIN_TOKEN is required.");
 }
 
 const pool = new Pool({ connectionString: databaseUrl });
@@ -28,8 +34,10 @@ const app = createMarketplaceApi({
   store,
   payTo,
   sessionSecret,
+  adminToken,
   facilitatorClient: createX402FacilitatorClient(facilitatorUrl),
-  baseUrl
+  baseUrl,
+  webBaseUrl
 });
 
 const server = app.listen(port, () => {

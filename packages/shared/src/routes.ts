@@ -39,6 +39,17 @@ export const marketplaceRoutes: MarketplaceRoute[] = [
     price: "$0.05",
     title: "Quick Insight",
     description: "Return a paid single-shot mock insight response.",
+    requestExample: {
+      query: "fast-native data marketplaces"
+    },
+    responseExample: {
+      provider: "mock",
+      operation: "quick-insight",
+      query: "fast-native data marketplaces",
+      summary: "Mock alpha signal for fast-native data marketplaces.",
+      generatedAt: "2026-03-18T00:00:00.000Z"
+    },
+    usageNotes: "Use this for low-latency paid lookups that should resolve in a single round trip.",
     payout: {
       providerAccountId: "mock",
       providerWallet: null,
@@ -57,6 +68,18 @@ export const marketplaceRoutes: MarketplaceRoute[] = [
     price: "$0.15",
     title: "Async Report",
     description: "Create a paid async mock report job and return a job token.",
+    requestExample: {
+      topic: "consumer AI distribution shifts",
+      delayMs: 5000
+    },
+    responseExample: {
+      provider: "mock",
+      operation: "async-report",
+      topic: "consumer AI distribution shifts",
+      report: "Mock report body for consumer AI distribution shifts.",
+      completedAt: "2026-03-18T00:00:05.000Z"
+    },
+    usageNotes: "Use this when the upstream data source has variable latency and the result should be polled asynchronously.",
     payout: {
       providerAccountId: "mock",
       providerWallet: null,

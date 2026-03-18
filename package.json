@@ -7,17 +7,23 @@
     "packages/*"
   ],
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck:workspace": "tsc --noEmit",
+    "typecheck:web": "tsc --noEmit -p apps/web/tsconfig.json",
+    "typecheck": "npm run typecheck:workspace && npm run typecheck:web",
     "build:runtime": "tsup --config tsup.config.ts",
-    "build": "npm run typecheck && npm run build:runtime",
+    "build:web": "npm run build --workspace @marketplace/web",
+    "build": "npm run typecheck && npm run build:runtime && npm run build:web",
     "test": "vitest run",
+    "test:web:smoke": "npm run build:web && playwright test --config apps/web/playwright.config.ts",
     "dev:api": "tsx apps/api/src/index.ts",
     "dev:facilitator": "tsx apps/facilitator/src/index.ts",
     "dev:worker": "tsx apps/worker/src/index.ts",
+    "dev:web": "npm run dev --workspace @marketplace/web",
     "cli": "tsx packages/cli/src/index.ts",
     "start:api": "node dist/apps/api/index.js",
     "start:facilitator": "node dist/apps/facilitator/index.js",
     "start:worker": "node dist/apps/worker/index.js",
+    "start:web": "npm run start --workspace @marketplace/web",
     "start:cli": "node dist/packages/cli/index.js"
   },
   "dependencies": {
@@ -34,10 +40,16 @@
     "zod-to-json-schema": "^3.24.6"
   },
   "devDependencies": {
+    "@playwright/test": "^1.54.2",
     "@types/express": "^5.0.3",
     "@types/node": "^24.0.15",
     "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
     "@types/supertest": "^6.0.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
+    "jsdom": "^26.1.0",
     "supertest": "^7.1.1",
     "tsup": "^8.5.0",
     "tsx": "^4.20.6",

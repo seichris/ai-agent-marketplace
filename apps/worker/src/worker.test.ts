@@ -8,7 +8,6 @@ describe("marketplace worker", () => {
   it("refunds a permanently failed async job", async () => {
     const store = new InMemoryMarketplaceStore();
     const registry = createDefaultProviderRegistry();
-    const route = registry.mock;
 
     const buyerWallet = "fast1x0g58phuf0pf32e9uvp3mv6hak4z37ytpqyfzjzhfsehua9kmegqwzv0td";
 
@@ -22,18 +21,20 @@ describe("marketplace worker", () => {
         operation: "async-report",
         version: "v1",
         mode: "async",
-      network: "fast-mainnet",
-      price: "$0.15",
-      title: "Async Report",
-      description: "desc",
-      payout: {
-        providerAccountId: "mock",
-        providerWallet: null,
-        providerBps: 0
+        network: "fast-mainnet",
+        price: "$0.15",
+        title: "Async Report",
+        description: "desc",
+        requestExample: { topic: "failing report" },
+        responseExample: { report: "failed" },
+        payout: {
+          providerAccountId: "mock",
+          providerWallet: null,
+          providerBps: 0
+        },
+        inputSchema: null as never,
+        outputSchema: null as never
       },
-      inputSchema: null as never,
-      outputSchema: null as never
-    },
       quotedPrice: "150000",
       payoutSplit: {
         currency: "fastUSDC",
