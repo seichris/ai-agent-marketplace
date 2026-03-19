@@ -10,7 +10,7 @@ export function AccordionItem({
   className,
   ...props
 }: React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Item>) {
-  return <AccordionPrimitive.Item className={cn("border-b border-border/70", className)} {...props} />;
+  return <AccordionPrimitive.Item className={cn("border-b", className)} {...props} />;
 }
 
 export function AccordionTrigger({
@@ -22,7 +22,7 @@ export function AccordionTrigger({
     <AccordionPrimitive.Header className="flex">
       <AccordionPrimitive.Trigger
         className={cn(
-          "group flex flex-1 items-center justify-between gap-4 py-5 text-left text-sm font-medium transition-colors hover:text-foreground/80",
+          "group flex flex-1 items-center justify-between py-4 text-left text-sm font-medium transition-all hover:underline",
           className
         )}
         {...props}
@@ -41,7 +41,7 @@ export function AccordionContent({
 }: React.ComponentPropsWithoutRef<typeof AccordionPrimitive.Content>) {
   return (
     <AccordionPrimitive.Content className={cn("overflow-hidden text-sm", className)} {...props}>
-      <div className="pb-5">{children}</div>
+      <div className="pb-4 pt-0">{children}</div>
     </AccordionPrimitive.Content>
   );
 }

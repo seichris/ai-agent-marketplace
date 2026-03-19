@@ -26,13 +26,13 @@ export function SuggestionForm({
 }) {
   const [state, action, pending] = useActionState(submitSuggestionAction, initialState);
   const selectClassName =
-    "h-12 rounded-2xl border border-border bg-black/20 px-4 text-sm text-foreground outline-none transition-colors focus:border-ring";
+    "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring";
 
   return (
-    <Card className="bg-[linear-gradient(180deg,rgba(10,14,26,0.9),rgba(9,12,20,0.92))]">
+    <Card>
       <CardHeader>
         <CardDescription>Suggest new supply</CardDescription>
-        <CardTitle className="text-3xl">Tell providers what to build next</CardTitle>
+        <CardTitle>Tell providers what to build next</CardTitle>
       </CardHeader>
       <CardContent>
         <form action={action} className="grid gap-4">
@@ -97,10 +97,10 @@ export function SuggestionForm({
 
           {state.message ? (
             <div
-              className={`rounded-2xl border px-4 py-3 text-sm ${
+              className={`rounded-md border px-4 py-3 text-sm ${
                 state.ok
-                  ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-200"
-                  : "border-rose-400/30 bg-rose-400/10 text-rose-200"
+                  ? "border bg-muted text-foreground"
+                  : "border-destructive/30 bg-destructive/10 text-destructive"
               }`}
             >
               {state.message}

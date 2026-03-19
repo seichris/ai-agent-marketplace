@@ -49,94 +49,79 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
   const totals = buildMarketplaceTotals(services);
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-10 px-6 py-8 md:px-10 md:py-12">
-      <section className="relative overflow-hidden rounded-[36px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.16),transparent_28%),radial-gradient(circle_at_80%_20%,rgba(52,211,153,0.14),transparent_24%),linear-gradient(160deg,rgba(10,14,26,0.94),rgba(9,12,20,0.96))] px-6 py-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,1)] md:px-10 md:py-12">
-        <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 bg-[radial-gradient(circle_at_center,rgba(125,211,252,0.12),transparent_48%)] md:block" />
-        <div className="relative grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
-          <div className="space-y-5">
-            <Badge className="bg-white/[0.06] text-foreground">Fast-native agent marketplace</Badge>
-            <div className="space-y-4">
-              <h1 className="max-w-3xl font-sans text-4xl font-semibold tracking-tight text-foreground md:text-6xl">
-                Discover and price agent-ready APIs in a live market catalog.
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-foreground/72 md:text-lg">
-                Browse paid x402 routes, compare service performance, copy exact usage prompts, and steer supply by
-                suggesting the next endpoints or source integrations providers should ship.
-              </p>
-            </div>
-            <div className="flex flex-wrap gap-3">
-              <Button onClick={() => window.location.assign("/suggest?type=endpoint")}>Suggest an endpoint</Button>
-              <Button variant="secondary" onClick={() => window.location.assign("/skill.md")}>
-                Read SKILL.md
-              </Button>
-            </div>
+    <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 md:py-12">
+      <section className="grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
+        <div className="space-y-5">
+          <Badge variant="outline">Fast-native agent marketplace</Badge>
+          <div className="space-y-4">
+            <h1 className="max-w-3xl text-4xl font-semibold tracking-tight md:text-5xl">
+              Discover and price agent-ready APIs in a live market catalog.
+            </h1>
+            <p className="max-w-2xl text-base leading-7 text-muted-foreground">
+              Browse paid x402 routes, compare service performance, copy exact usage prompts, and suggest the next
+              endpoints or source integrations providers should ship.
+            </p>
           </div>
-
-          <Card className="border-white/10 bg-black/20">
-            <CardHeader>
-              <CardDescription>Marketplace totals</CardDescription>
-              <CardTitle className="text-3xl">Catalog snapshot</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Services</div>
-                <div className="mt-2 text-3xl font-semibold">{services.length}</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Endpoints</div>
-                <div className="mt-2 text-3xl font-semibold">{totals.endpoints}</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Call volume</div>
-                <div className="mt-2 text-3xl font-semibold">{totals.calls}</div>
-              </div>
-              <div>
-                <div className="text-[11px] uppercase tracking-[0.22em] text-muted-foreground">Revenue</div>
-                <div className="mt-2 text-3xl font-semibold">${totals.revenue.toFixed(2)}</div>
-              </div>
-            </CardContent>
-          </Card>
+          <div className="flex flex-wrap gap-3">
+            <Button onClick={() => window.location.assign("/suggest?type=endpoint")}>Suggest an endpoint</Button>
+            <Button variant="outline" onClick={() => window.location.assign("/skill.md")}>
+              Read SKILL.md
+            </Button>
+          </div>
         </div>
+
+        <Card>
+          <CardHeader>
+            <CardDescription>Marketplace totals</CardDescription>
+            <CardTitle>Catalog snapshot</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-4 sm:grid-cols-2">
+            <Metric label="Services" value={String(services.length)} />
+            <Metric label="Endpoints" value={String(totals.endpoints)} />
+            <Metric label="Call volume" value={String(totals.calls)} />
+            <Metric label="Revenue" value={`$${totals.revenue.toFixed(2)}`} />
+          </CardContent>
+        </Card>
       </section>
 
-      <section className="grid gap-4 rounded-[30px] border border-border/70 bg-card/85 p-4 md:grid-cols-[1fr_auto]">
-        <label className="relative block">
-          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Search services, owners, or categories"
-            className="pl-11"
-          />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          {categories.map((item) => (
-            <button
-              key={item}
-              type="button"
-              onClick={() => setCategory(item)}
-              className={`rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
-                item === category
-                  ? "border-white bg-white text-black"
-                  : "border-border bg-black/10 text-foreground hover:bg-white/8"
-              }`}
-            >
-              {item}
-            </button>
-          ))}
-        </div>
-      </section>
+      <Card>
+        <CardContent className="grid gap-4 p-6 md:grid-cols-[1fr_auto]">
+          <label className="relative block">
+            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search services, owners, or categories"
+              className="pl-9"
+            />
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {categories.map((item) => (
+              <button
+                key={item}
+                type="button"
+                onClick={() => setCategory(item)}
+                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                  item === category
+                    ? "bg-primary text-primary-foreground"
+                    : "bg-background hover:bg-accent hover:text-accent-foreground"
+                }`}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
 
       <section className="grid gap-5 lg:grid-cols-2">
         {filtered.map((service) => (
           <Link key={service.slug} href={`/services/${service.slug}`} className="group">
-            <Card className="h-full overflow-hidden transition-transform duration-200 group-hover:-translate-y-1">
+            <Card className="h-full transition-colors group-hover:bg-accent/40">
               <CardHeader className="gap-4">
                 <div className="flex flex-wrap items-center gap-2">
-                  <Badge>{service.ownerName}</Badge>
-                  <span className="text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground">
-                    {service.priceRange}
-                  </span>
+                  <Badge variant="outline">{service.ownerName}</Badge>
+                  <span className="text-sm text-muted-foreground">{service.priceRange}</span>
                 </div>
                 <div className="space-y-2">
                   <CardTitle className="text-2xl">{service.name}</CardTitle>
@@ -146,34 +131,22 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
               <CardContent className="space-y-5">
                 <div className="flex flex-wrap gap-2">
                   {service.categories.map((item) => (
-                    <Badge key={item} className="bg-background">
+                    <Badge key={item} variant="outline">
                       {item}
                     </Badge>
                   ))}
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-4">
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Calls</div>
-                    <div className="mt-2 text-2xl font-semibold">{service.totalCalls}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Revenue</div>
-                    <div className="mt-2 text-2xl font-semibold">${service.revenue}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Endpoints</div>
-                    <div className="mt-2 text-2xl font-semibold">{service.endpointCount}</div>
-                  </div>
-                  <div>
-                    <div className="text-[11px] uppercase tracking-[0.2em] text-muted-foreground">30d success</div>
-                    <div className="mt-2 text-2xl font-semibold">{service.successRate30d.toFixed(1)}%</div>
-                  </div>
+                  <Metric label="Calls" value={String(service.totalCalls)} compact />
+                  <Metric label="Revenue" value={`$${service.revenue}`} compact />
+                  <Metric label="Endpoints" value={String(service.endpointCount)} compact />
+                  <Metric label="30d success" value={`${service.successRate30d.toFixed(1)}%`} compact />
                 </div>
 
-                <div className="flex items-center justify-between border-t border-border/70 pt-4 text-sm text-muted-foreground">
+                <div className="flex items-center justify-between border-t pt-4 text-sm text-muted-foreground">
                   <span>Open service</span>
-                  <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                  <ArrowRight className="h-4 w-4" />
                 </div>
               </CardContent>
             </Card>
@@ -181,5 +154,22 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
         ))}
       </section>
     </main>
+  );
+}
+
+function Metric({
+  label,
+  value,
+  compact = false
+}: {
+  label: string;
+  value: string;
+  compact?: boolean;
+}) {
+  return (
+    <div>
+      <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+      <div className={compact ? "mt-2 text-xl font-semibold" : "mt-2 text-2xl font-semibold"}>{value}</div>
+    </div>
   );
 }

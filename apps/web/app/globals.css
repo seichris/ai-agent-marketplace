@@ -1,34 +1,54 @@
 @import "tailwindcss";
 
 @theme inline {
-  --font-sans: var(--font-space-grotesk);
-  --font-mono: var(--font-ibm-plex-mono);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
+  --color-input: var(--input);
   --color-ring: var(--ring);
 }
 
 :root {
-  color-scheme: dark;
-  --background: #060911;
-  --foreground: #eff5ff;
-  --card: rgba(9, 13, 24, 0.82);
-  --card-foreground: #eff5ff;
-  --muted: rgba(148, 163, 184, 0.09);
-  --muted-foreground: #93a4c2;
-  --border: rgba(148, 163, 184, 0.16);
-  --ring: #7dd3fc;
-  --chart-1: #7dd3fc;
-  --chart-2: #34d399;
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(0.985 0 0);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
 }
 
 * {
   box-sizing: border-box;
+  border-color: var(--border);
 }
 
 html {
@@ -37,7 +57,6 @@ html {
 
 body {
   margin: 0;
-  font-family: var(--font-space-grotesk), sans-serif;
   color: var(--foreground);
   background: var(--background);
   min-height: 100vh;
@@ -57,10 +76,5 @@ select {
 
 pre,
 code {
-  font-family: var(--font-ibm-plex-mono), monospace;
-}
-
-::selection {
-  background: rgba(125, 211, 252, 0.26);
-  color: var(--foreground);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
 }

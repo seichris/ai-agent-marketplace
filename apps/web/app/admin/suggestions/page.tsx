@@ -35,15 +35,15 @@ export default async function AdminSuggestionsPage({
       : undefined
   );
   const selectClassName =
-    "h-11 rounded-2xl border border-border bg-black/20 px-4 text-sm text-foreground outline-none transition-colors focus:border-ring";
+    "h-9 rounded-md border border-input bg-transparent px-3 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring";
   const textareaClassName =
-    "min-h-24 rounded-[24px] border border-border bg-black/20 px-4 py-3 text-sm text-foreground outline-none transition-colors focus:border-ring";
+    "min-h-24 rounded-md border border-input bg-transparent px-3 py-2 text-sm outline-none transition-colors focus-visible:ring-1 focus-visible:ring-ring";
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 md:py-12">
-      <section className="flex flex-wrap items-end justify-between gap-4 rounded-[32px] border border-border/70 bg-[radial-gradient(circle_at_top_left,rgba(125,211,252,0.14),transparent_26%),linear-gradient(160deg,rgba(10,14,26,0.94),rgba(9,12,20,0.96))] p-8 shadow-[0_40px_120px_-70px_rgba(0,0,0,1)]">
+      <section className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-3">
-          <Link href="/" className="text-sm font-medium text-muted-foreground hover:text-foreground">
+          <Link href="/" className="text-sm font-medium text-muted-foreground hover:underline">
             Back to marketplace
           </Link>
           <div>
@@ -54,7 +54,7 @@ export default async function AdminSuggestionsPage({
           </div>
         </div>
         <form action={adminLogoutAction}>
-          <Button type="submit" variant="secondary">
+          <Button type="submit" variant="outline">
             Log out
           </Button>
         </form>
@@ -69,8 +69,8 @@ export default async function AdminSuggestionsPage({
             <Link
               key={status}
               href={href}
-              className={`rounded-full border px-4 py-2 text-sm font-medium ${
-                isActive ? "border-white bg-white text-black" : "border-border bg-card"
+              className={`rounded-md border px-4 py-2 text-sm font-medium ${
+                isActive ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent hover:text-accent-foreground"
               }`}
             >
               {status}
@@ -86,14 +86,14 @@ export default async function AdminSuggestionsPage({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="space-y-2">
                   <div className="flex flex-wrap gap-2">
-                    <Badge>{suggestion.type}</Badge>
-                    <Badge className="bg-background">{suggestion.status}</Badge>
-                    {suggestion.serviceSlug ? <Badge className="bg-background">{suggestion.serviceSlug}</Badge> : null}
+                    <Badge variant="outline">{suggestion.type}</Badge>
+                    <Badge variant="secondary">{suggestion.status}</Badge>
+                    {suggestion.serviceSlug ? <Badge variant="outline">{suggestion.serviceSlug}</Badge> : null}
                   </div>
                   <CardTitle>{suggestion.title}</CardTitle>
                   <CardDescription>{suggestion.description}</CardDescription>
                 </div>
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">
+                <div className="text-xs uppercase text-muted-foreground">
                   {suggestion.createdAt.slice(0, 10)}
                 </div>
               </div>

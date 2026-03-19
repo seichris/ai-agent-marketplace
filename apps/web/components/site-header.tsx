@@ -14,34 +14,34 @@ export function SiteHeader({
   networkLabel: string;
 }) {
   return (
-    <header className="sticky top-0 z-30 border-b border-border/80 bg-background/78 backdrop-blur-xl">
+    <header className="sticky top-0 z-30 border-b bg-background">
       <div className="mx-auto flex w-full max-w-7xl flex-col gap-4 px-6 py-4 md:px-10 lg:flex-row lg:items-center lg:justify-between">
         <Link href="/" className="flex items-center gap-3">
-          <span className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white text-sm font-semibold text-black shadow-[0_8px_30px_-12px_rgba(255,255,255,0.75)]">
+          <span className="flex h-10 w-10 items-center justify-center rounded-md border bg-muted text-sm font-semibold">
             F
           </span>
           <div>
-            <div className="text-sm font-semibold text-foreground">Fast Marketplace</div>
-            <div className="text-[11px] uppercase tracking-[0.24em] text-muted-foreground">Paid APIs For Agents</div>
+            <div className="text-sm font-semibold">Fast Marketplace</div>
+            <div className="text-xs text-muted-foreground">Paid APIs for agents</div>
           </div>
         </Link>
 
-        <nav className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+        <nav className="flex flex-wrap items-center gap-2 text-sm">
           <Link
             href="/"
-            className="rounded-full border border-transparent px-4 py-2 font-medium transition-colors hover:border-border hover:bg-card hover:text-foreground"
+            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Marketplace
           </Link>
           <Link
             href="/suggest"
-            className="rounded-full border border-transparent px-4 py-2 font-medium transition-colors hover:border-border hover:bg-card hover:text-foreground"
+            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             Suggest
           </Link>
           <Link
             href="/skill.md"
-            className="rounded-full border border-transparent px-4 py-2 font-medium transition-colors hover:border-border hover:bg-card hover:text-foreground"
+            className="rounded-md px-3 py-2 text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
           >
             SKILL.md
           </Link>

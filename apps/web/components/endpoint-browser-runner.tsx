@@ -6,6 +6,7 @@ import type { ServiceCatalogEndpoint } from "@marketplace/shared";
 import type { WebDeploymentNetwork } from "@/lib/network";
 
 import { CopyButton } from "@/components/copy-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -17,7 +18,6 @@ import {
   rawAmountToHex,
   selectPaymentRequirement,
   type BrowserConnectorLike,
-  type BrowserPaymentRequirement,
   type BrowserPaymentRequired
 } from "@/lib/browser-x402";
 
@@ -206,10 +206,10 @@ export function EndpointBrowserRunner({
   }
 
   return (
-    <div className="space-y-4 rounded-[24px] border border-cyan-400/15 bg-[linear-gradient(180deg,rgba(6,9,16,0.92),rgba(7,12,22,0.88))] p-4 lg:col-span-2">
+    <div className="space-y-4 rounded-md border p-4 lg:col-span-2">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="text-xs uppercase tracking-[0.18em] text-cyan-100/70">Browser Execution</div>
+          <div className="text-xs font-medium text-muted-foreground">Browser execution</div>
           <div className="mt-1 text-base font-semibold text-foreground">
             {isPaid ? "Pay and run this endpoint with the Fast extension" : "Run this endpoint in the browser"}
           </div>
@@ -218,15 +218,15 @@ export function EndpointBrowserRunner({
             with the x402 proof directly from the browser wallet.
           </p>
         </div>
-        <div className="inline-flex items-center gap-2 rounded-full border border-cyan-400/20 bg-cyan-400/8 px-3 py-2 text-xs font-medium uppercase tracking-[0.18em] text-cyan-100">
+        <Badge variant="outline" className="gap-2">
           <Wallet className="h-3.5 w-3.5" />
           {paymentNetworkForDeployment(deploymentNetwork)}
-        </div>
+        </Badge>
       </div>
 
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-3">
-          <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Request Body</div>
+          <div className="text-xs font-medium text-muted-foreground">Request body</div>
           <CopyButton value={requestBody} />
         </div>
         <Textarea value={requestBody} onChange={(event) => setRequestBody(event.target.value)} />
@@ -246,24 +246,24 @@ export function EndpointBrowserRunner({
       </div>
 
       {error ? (
-        <div className="flex items-center gap-2 rounded-[20px] border border-amber-300/20 bg-amber-200/8 px-4 py-3 text-sm text-amber-100">
+        <div className="flex items-center gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
           <TriangleAlert className="h-4 w-4 shrink-0" />
           <span>{error}</span>
         </div>
       ) : null}
 
       {result ? (
-        <div className="space-y-4 rounded-[20px] border border-border/70 bg-black/20 p-4">
+        <div className="space-y-4 rounded-md border bg-muted/30 p-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Latest Response</div>
+              <div className="text-xs font-medium text-muted-foreground">Latest response</div>
               <div className="mt-1 text-sm font-medium text-foreground">HTTP {result.statusCode}</div>
             </div>
             <CopyButton value={formatResponseBody(result.body)} />
           </div>
 
           {result.payment ? (
-            <div className="grid gap-3 rounded-[20px] border border-emerald-400/15 bg-emerald-400/5 p-4 sm:grid-cols-3">
+            <div className="grid gap-3 rounded-md border bg-background p-4 sm:grid-cols-3">
               <Detail label="Amount" value={`${formatRawAmount(result.payment.amountRaw)} ${endpoint.tokenSymbol}`} />
               <Detail label="Recipient" value={shorten(result.payment.recipient)} />
               <Detail label="Transaction" value={result.payment.txHash} />
@@ -275,26 +275,26 @@ export function EndpointBrowserRunner({
               href={result.payment.explorerUrl}
               target="_blank"
               rel="noreferrer"
-              className="inline-flex text-sm font-medium text-cyan-100 hover:text-cyan-50"
+              className="inline-flex text-sm font-medium hover:underline"
             >
               Open transaction in explorer
             </a>
           ) : null}
 
-          <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+          <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7">
             {formatResponseBody(result.body)}
           </pre>
         </div>
       ) : null}
 
       {job ? (
-        <div className="space-y-3 rounded-[20px] border border-border/70 bg-black/20 p-4">
+        <div className="space-y-3 rounded-md border bg-muted/30 p-4">
           <div className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Async Job</div>
+              <div className="text-xs font-medium text-muted-foreground">Async job</div>
               <div className="mt-1 text-sm font-medium text-foreground">{job.jobToken}</div>
             </div>
-            <div className="rounded-full border border-white/10 bg-white/6 px-3 py-1 text-xs font-medium uppercase tracking-[0.18em] text-foreground">
+            <div className="rounded-md border px-3 py-1 text-xs font-medium">
               {job.status}
             </div>
           </div>
@@ -305,24 +305,24 @@ export function EndpointBrowserRunner({
           {job.result !== undefined ? (
             <div className="space-y-2">
               <div className="flex items-center justify-between gap-3">
-                <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Job Result</div>
+                <div className="text-xs font-medium text-muted-foreground">Job result</div>
                 <CopyButton value={formatResponseBody(job.result)} />
               </div>
-              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7">
                 {formatResponseBody(job.result)}
               </pre>
             </div>
           ) : null}
           {job.error ? (
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Job Error</div>
-              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-amber-100">{job.error}</pre>
+              <div className="text-xs font-medium text-muted-foreground">Job error</div>
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-destructive">{job.error}</pre>
             </div>
           ) : null}
           {job.refund !== undefined ? (
             <div className="space-y-2">
-              <div className="text-xs uppercase tracking-[0.18em] text-muted-foreground">Refund</div>
-              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7 text-foreground/80">
+              <div className="text-xs font-medium text-muted-foreground">Refund</div>
+              <pre className="overflow-x-auto whitespace-pre-wrap text-sm leading-7">
                 {formatResponseBody(job.refund)}
               </pre>
             </div>
@@ -336,7 +336,7 @@ export function EndpointBrowserRunner({
 function Detail({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[11px] uppercase tracking-[0.18em] text-muted-foreground">{label}</div>
+      <div className="text-xs font-medium text-muted-foreground">{label}</div>
       <div className="mt-2 break-all text-sm font-medium text-foreground">{value}</div>
     </div>
   );
