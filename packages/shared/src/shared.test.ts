@@ -107,7 +107,11 @@ describe("shared marketplace helpers", () => {
   });
 
   it("builds route entries into the OpenAPI document", () => {
-    const document = buildOpenApiDocument("http://localhost:3000");
+    const document = buildOpenApiDocument({
+      baseUrl: "http://localhost:3000",
+      services: listServiceDefinitions(),
+      routes: marketplaceRoutes
+    });
     expect(document.paths["/api/mock/quick-insight"]).toBeDefined();
     expect(document.paths["/api/mock/async-report"]).toBeDefined();
     expect(document.paths["/catalog/services"]).toBeDefined();
@@ -137,8 +141,10 @@ describe("shared marketplace helpers", () => {
 
   it("builds service catalog summaries and prompts from the shared registry", () => {
     const service = listServiceDefinitions()[0];
+    const endpoints = marketplaceRoutes.filter((route) => service.routeIds.includes(route.routeId));
     const detail = buildServiceDetail({
       service,
+      endpoints,
       analytics: {
         totalCalls: 12,
         revenueRaw: "420000",
@@ -149,7 +155,7 @@ describe("shared marketplace helpers", () => {
       webBaseUrl: "https://fast.8o.vc"
     });
 
-    expect(buildPriceRange(marketplaceRoutes)).toBe("$0.05 fastUSDC - $0.15 fastUSDC");
+    expect(buildPriceRange(endpoints)).toBe("$0.05 fastUSDC - $0.15 fastUSDC");
     expect(detail.skillUrl).toBe("https://fast.8o.vc/skill.md");
     expect(detail.summary.endpointCount).toBe(2);
     expect(detail.summary.settlementToken).toBe("fastUSDC");
@@ -229,5 +235,74 @@ describe("shared marketplace helpers", () => {
 
     expect(updated?.status).toBe("reviewing");
     expect((await store.listSuggestions()).length).toBe(1);
+  });
+
+  it("publishes provider snapshots and resolves them by api namespace and operation", async () => {
+    const store = new InMemoryMarketplaceStore();
+    const wallet = "fast1provider000000000000000000000000000000000000000000000000000000";
+
+    await store.upsertProviderAccount(wallet, {
+      displayName: "Signal Labs",
+      websiteUrl: "https://provider.example.com"
+    });
+
+    const created = await store.createProviderService(wallet, {
+      slug: "signal-labs",
+      apiNamespace: "signals",
+      name: "Signal Labs",
+      tagline: "Short-form market signals",
+      about: "Provider-authored signal endpoints.",
+      categories: ["Research"],
+      promptIntro: 'I want to use the "Signal Labs" service on Fast Marketplace.',
+      setupInstructions: ["Use a funded Fast wallet."],
+      websiteUrl: "https://provider.example.com",
+      payoutWallet: wallet
+    });
+
+    await store.createProviderEndpointDraft(created.service.id, wallet, {
+      operation: "quote",
+      title: "Quote",
+      description: "Return a single quote snapshot.",
+      price: "$0.25",
+      mode: "sync",
+      requestSchemaJson: {
+        type: "object",
+        properties: {
+          symbol: { type: "string" }
+        },
+        required: ["symbol"],
+        additionalProperties: false
+      },
+      responseSchemaJson: {
+        type: "object",
+        properties: {
+          symbol: { type: "string" },
+          price: { type: "number" }
+        },
+        required: ["symbol", "price"],
+        additionalProperties: false
+      },
+      requestExample: { symbol: "FAST" },
+      responseExample: { symbol: "FAST", price: 42.5 },
+      upstreamBaseUrl: "https://provider.example.com",
+      upstreamPath: "/api/quote",
+      upstreamAuthMode: "none"
+    });
+
+    await store.createProviderVerificationChallenge(created.service.id, wallet);
+    await store.markProviderVerificationResult(created.service.id, "verified", {
+      verifiedHost: "provider.example.com"
+    });
+    await store.submitProviderService(created.service.id, wallet);
+    await store.publishProviderService(created.service.id, {
+      reviewerIdentity: "ops@test"
+    });
+
+    const published = await store.findPublishedRoute("signals", "quote", "fast-mainnet");
+    expect(published?.routeId).toBe("signals.quote.v1");
+
+    const publicService = await store.getPublishedServiceBySlug("signal-labs");
+    expect(publicService?.service.status).toBe("published");
+    expect(publicService?.endpoints).toHaveLength(1);
   });
 });

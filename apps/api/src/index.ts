@@ -12,6 +12,7 @@ const sessionSecret = process.env.MARKETPLACE_SESSION_SECRET ?? "development-mar
 const adminToken = process.env.MARKETPLACE_ADMIN_TOKEN;
 const baseUrl = process.env.MARKETPLACE_BASE_URL ?? `http://localhost:${port}`;
 const webBaseUrl = process.env.MARKETPLACE_WEB_BASE_URL ?? baseUrl;
+const secretsKey = process.env.MARKETPLACE_SECRETS_KEY ?? "development-marketplace-secrets-key";
 
 if (!databaseUrl) {
   throw new Error("DATABASE_URL is required.");
@@ -37,7 +38,8 @@ const app = createMarketplaceApi({
   adminToken,
   facilitatorClient: createX402FacilitatorClient(facilitatorUrl),
   baseUrl,
-  webBaseUrl
+  webBaseUrl,
+  secretsKey
 });
 
 const server = app.listen(port, () => {

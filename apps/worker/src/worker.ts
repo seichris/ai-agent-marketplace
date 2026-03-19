@@ -1,10 +1,8 @@
 import { FastProvider, FastWallet } from "@fastxyz/sdk";
 import {
   createDefaultProviderRegistry,
-  findMarketplaceRouteById,
   rawToDecimalString,
   resolveMarketplaceNetworkConfig,
-  type JobRecord,
   type MarketplaceStore,
   type MarketplaceDeploymentNetwork,
   type ProviderRegistry,
@@ -23,9 +21,10 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
   const jobs = await options.store.listPendingJobs(options.limit ?? 10);
 
   for (const job of jobs) {
-    const route = findMarketplaceRouteById(job.routeId);
-    if (!route) {
-      await options.store.failJob(job.jobToken, `Missing route registry entry: ${job.routeId}`);
+    const route = job.routeSnapshot;
+
+    if (route.executorKind !== "mock") {
+      await options.store.failJob(job.jobToken, `Unsupported async executor: ${route.executorKind}`);
       continue;
     }
 
