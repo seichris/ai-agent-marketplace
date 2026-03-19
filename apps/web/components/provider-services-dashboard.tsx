@@ -40,10 +40,22 @@ function ProviderServicesDashboardInner({
   apiBaseUrl: string;
   accessToken: string;
 }) {
+  type ServiceDraftField =
+    | "slug"
+    | "apiNamespace"
+    | "name"
+    | "tagline"
+    | "about"
+    | "categories"
+    | "promptIntro"
+    | "setupInstructions"
+    | "websiteUrl"
+    | "payoutWallet";
   const [services, setServices] = React.useState<Awaited<ReturnType<typeof fetchProviderServices>>>([]);
   const [hasAccount, setHasAccount] = React.useState<boolean | null>(null);
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = React.useState<Partial<Record<ServiceDraftField, string>>>({});
   const [form, setForm] = React.useState({
     slug: "",
     apiNamespace: "",
@@ -75,9 +87,17 @@ function ProviderServicesDashboardInner({
   function onCreateService(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError(null);
+    const nextFieldErrors = validateServiceDraftForm(form);
+    setFieldErrors(nextFieldErrors);
+
+    if (Object.keys(nextFieldErrors).length > 0) {
+      setError("Fix the highlighted fields before creating the draft.");
+      return;
+    }
 
     startTransition(async () => {
       try {
+        setFieldErrors({});
         const detail = await createProviderService(apiBaseUrl, accessToken, {
           slug: form.slug,
           apiNamespace: form.apiNamespace,
@@ -164,54 +184,119 @@ function ProviderServicesDashboardInner({
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium">
                 Service name
-                <Input value={form.name} onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))} required />
+                <Input
+                  value={form.name}
+                  minLength={2}
+                  maxLength={120}
+                  onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
+                  required
+                />
+                {fieldErrors.name ? <span className="text-xs text-destructive">{fieldErrors.name}</span> : null}
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 Tagline
-                <Input value={form.tagline} onChange={(event) => setForm((current) => ({ ...current, tagline: event.target.value }))} required />
+                <Input
+                  value={form.tagline}
+                  minLength={5}
+                  maxLength={240}
+                  onChange={(event) => setForm((current) => ({ ...current, tagline: event.target.value }))}
+                  required
+                />
+                {fieldErrors.tagline ? <span className="text-xs text-destructive">{fieldErrors.tagline}</span> : null}
               </label>
             </div>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium">
                 Slug
-                <Input value={form.slug} onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))} required />
+                <Input
+                  value={form.slug}
+                  minLength={3}
+                  maxLength={64}
+                  pattern="^[a-z0-9-]{3,64}$"
+                  onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
+                  required
+                />
+                {fieldErrors.slug ? <span className="text-xs text-destructive">{fieldErrors.slug}</span> : null}
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 API namespace
-                <Input value={form.apiNamespace} onChange={(event) => setForm((current) => ({ ...current, apiNamespace: event.target.value }))} required />
+                <Input
+                  value={form.apiNamespace}
+                  minLength={3}
+                  maxLength={64}
+                  pattern="^[a-z0-9-]{3,64}$"
+                  onChange={(event) => setForm((current) => ({ ...current, apiNamespace: event.target.value }))}
+                  required
+                />
+                {fieldErrors.apiNamespace ? <span className="text-xs text-destructive">{fieldErrors.apiNamespace}</span> : null}
               </label>
             </div>
 
             <label className="grid gap-2 text-sm font-medium">
               About
-              <Textarea value={form.about} onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))} required />
+              <Textarea
+                value={form.about}
+                minLength={20}
+                maxLength={4000}
+                onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))}
+                required
+              />
+              {fieldErrors.about ? <span className="text-xs text-destructive">{fieldErrors.about}</span> : null}
             </label>
 
             <div className="grid gap-4 md:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium">
                 Categories
-                <Input value={form.categories} onChange={(event) => setForm((current) => ({ ...current, categories: event.target.value }))} />
+                <Input
+                  value={form.categories}
+                  onChange={(event) => setForm((current) => ({ ...current, categories: event.target.value }))}
+                />
+                {fieldErrors.categories ? <span className="text-xs text-destructive">{fieldErrors.categories}</span> : null}
               </label>
               <label className="grid gap-2 text-sm font-medium">
                 Website URL
-                <Input value={form.websiteUrl} onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))} placeholder="https://example.com" />
+                <Input
+                  value={form.websiteUrl}
+                  type="url"
+                  onChange={(event) => setForm((current) => ({ ...current, websiteUrl: event.target.value }))}
+                  placeholder="https://example.com"
+                />
+                {fieldErrors.websiteUrl ? <span className="text-xs text-destructive">{fieldErrors.websiteUrl}</span> : null}
               </label>
             </div>
 
             <label className="grid gap-2 text-sm font-medium">
               Prompt intro
-              <Textarea value={form.promptIntro} onChange={(event) => setForm((current) => ({ ...current, promptIntro: event.target.value }))} />
+              <Textarea
+                value={form.promptIntro}
+                minLength={10}
+                maxLength={500}
+                onChange={(event) => setForm((current) => ({ ...current, promptIntro: event.target.value }))}
+              />
+              <span className="text-xs text-muted-foreground">
+                Leave blank to auto-generate a prompt from the service name.
+              </span>
+              {fieldErrors.promptIntro ? <span className="text-xs text-destructive">{fieldErrors.promptIntro}</span> : null}
             </label>
 
             <label className="grid gap-2 text-sm font-medium">
               Setup instructions
-              <Textarea value={form.setupInstructions} onChange={(event) => setForm((current) => ({ ...current, setupInstructions: event.target.value }))} />
+              <Textarea
+                value={form.setupInstructions}
+                onChange={(event) => setForm((current) => ({ ...current, setupInstructions: event.target.value }))}
+              />
+              {fieldErrors.setupInstructions ? <span className="text-xs text-destructive">{fieldErrors.setupInstructions}</span> : null}
             </label>
 
             <label className="grid gap-2 text-sm font-medium">
               Payout wallet
-              <Input value={form.payoutWallet} onChange={(event) => setForm((current) => ({ ...current, payoutWallet: event.target.value }))} required />
+              <Input
+                value={form.payoutWallet}
+                onChange={(event) => setForm((current) => ({ ...current, payoutWallet: event.target.value }))}
+                required
+              />
+              {fieldErrors.payoutWallet ? <span className="text-xs text-destructive">{fieldErrors.payoutWallet}</span> : null}
             </label>
 
             <Button type="submit" disabled={pending}>
@@ -223,4 +308,91 @@ function ProviderServicesDashboardInner({
       </Card>
     </div>
   );
+}
+
+function validateServiceDraftForm(form: {
+  slug: string;
+  apiNamespace: string;
+  name: string;
+  tagline: string;
+  about: string;
+  categories: string;
+  promptIntro: string;
+  setupInstructions: string;
+  websiteUrl: string;
+  payoutWallet: string;
+}) {
+  const fieldErrors: Partial<Record<
+    | "slug"
+    | "apiNamespace"
+    | "name"
+    | "tagline"
+    | "about"
+    | "categories"
+    | "promptIntro"
+    | "setupInstructions"
+    | "websiteUrl"
+    | "payoutWallet",
+    string
+  >> = {};
+  const slugPattern = /^[a-z0-9-]{3,64}$/;
+  const categories = form.categories
+    .split(",")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const setupInstructions = form.setupInstructions
+    .split("\n")
+    .map((value) => value.trim())
+    .filter(Boolean);
+  const promptIntro = form.promptIntro.trim() || `I want to use the "${form.name.trim()}" service on Fast Marketplace.`;
+
+  if (!slugPattern.test(form.slug.trim())) {
+    fieldErrors.slug = "Use 3-64 lowercase letters, numbers, or hyphens.";
+  }
+
+  if (!slugPattern.test(form.apiNamespace.trim())) {
+    fieldErrors.apiNamespace = "Use 3-64 lowercase letters, numbers, or hyphens.";
+  }
+
+  if (form.name.trim().length < 2 || form.name.trim().length > 120) {
+    fieldErrors.name = "Name must be between 2 and 120 characters.";
+  }
+
+  if (form.tagline.trim().length < 5 || form.tagline.trim().length > 240) {
+    fieldErrors.tagline = "Tagline must be between 5 and 240 characters.";
+  }
+
+  if (form.about.trim().length < 20 || form.about.trim().length > 4_000) {
+    fieldErrors.about = "About must be between 20 and 4000 characters.";
+  }
+
+  if (categories.length < 1 || categories.length > 8 || categories.some((value) => value.length < 2 || value.length > 40)) {
+    fieldErrors.categories = "Use 1-8 categories, each between 2 and 40 characters.";
+  }
+
+  if (promptIntro.length < 10 || promptIntro.length > 500) {
+    fieldErrors.promptIntro = "Prompt intro must be between 10 and 500 characters.";
+  }
+
+  if (
+    setupInstructions.length < 1 ||
+    setupInstructions.length > 10 ||
+    setupInstructions.some((value) => value.length < 3 || value.length > 240)
+  ) {
+    fieldErrors.setupInstructions = "Use 1-10 setup steps, each between 3 and 240 characters.";
+  }
+
+  if (form.websiteUrl.trim()) {
+    try {
+      new URL(form.websiteUrl.trim());
+    } catch {
+      fieldErrors.websiteUrl = "Website URL must be a valid URL.";
+    }
+  }
+
+  if (!form.payoutWallet.trim()) {
+    fieldErrors.payoutWallet = "Payout wallet is required.";
+  }
+
+  return fieldErrors;
 }

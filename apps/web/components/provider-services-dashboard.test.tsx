@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import React from "react";
-import { render, screen, waitFor } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { ProviderServicesDashboard } from "./provider-services-dashboard";
@@ -96,5 +96,47 @@ describe("ProviderServicesDashboard", () => {
     expect(screen.getByText("Signal Labs")).toBeTruthy();
     expect(screen.getByText("New service draft")).toBeTruthy();
     expect(screen.getByRole("button", { name: /creat/i })).toBeTruthy();
+  });
+
+  it("validates the about field locally before creating a draft", async () => {
+    fetchProviderAccount.mockResolvedValue({
+      id: "account_1",
+      ownerWallet: "fast1provider000000000000000000000000000000000000000000000000000000",
+      displayName: "Signal Labs",
+      bio: null,
+      websiteUrl: "https://provider.example.com",
+      contactEmail: null,
+      createdAt: "2026-03-19T00:00:00.000Z",
+      updatedAt: "2026-03-19T00:00:00.000Z"
+    });
+    fetchProviderServices.mockResolvedValue([]);
+
+    render(
+      <ProviderServicesDashboard
+        apiBaseUrl="https://fastapi.8o.vc"
+        deploymentNetwork="mainnet"
+      />
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByText("New service draft").length).toBeGreaterThan(0);
+    });
+
+    fireEvent.change(screen.getAllByLabelText("Service name").at(-1)!, { target: { value: "Test Service 1" } });
+    fireEvent.change(screen.getAllByLabelText("Tagline").at(-1)!, { target: { value: "providing data for testing" } });
+    fireEvent.change(screen.getAllByLabelText("Slug").at(-1)!, { target: { value: "test-service-1" } });
+    fireEvent.change(screen.getAllByLabelText("API namespace").at(-1)!, { target: { value: "namespace" } });
+    fireEvent.change(screen.getAllByLabelText("About").at(-1)!, { target: { value: "Too short" } });
+    fireEvent.change(screen.getAllByLabelText("Payout wallet").at(-1)!, {
+      target: { value: "fast1rv8wsdd5pnkit4u637g2yj4tpuyq26rzw8380rfapnsnljz7v3tqv4ajuq" }
+    });
+
+    fireEvent.click(screen.getAllByRole("button", { name: "Create draft" }).at(-1)!);
+
+    await waitFor(() => {
+      expect(screen.getByText("About must be between 20 and 4000 characters.")).toBeTruthy();
+    });
+
+    expect(createProviderService).not.toHaveBeenCalled();
   });
 });
