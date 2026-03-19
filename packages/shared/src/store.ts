@@ -2300,6 +2300,79 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
 
+      WITH ranked_credit_topups AS (
+        SELECT
+          ctid,
+          account_id,
+          ROW_NUMBER() OVER (
+            PARTITION BY service_id, payment_id
+            ORDER BY created_at ASC, id ASC
+          ) AS row_num
+        FROM credit_ledger_entries
+        WHERE kind = 'topup'
+          AND payment_id IS NOT NULL
+      ),
+      duplicate_credit_topups AS (
+        SELECT ctid, account_id
+        FROM ranked_credit_topups
+        WHERE row_num > 1
+      ),
+      deleted_credit_topups AS (
+        DELETE FROM credit_ledger_entries
+        WHERE ctid IN (
+          SELECT ctid
+          FROM duplicate_credit_topups
+        )
+        RETURNING account_id
+      ),
+      affected_credit_accounts AS (
+        SELECT DISTINCT account_id
+        FROM duplicate_credit_topups
+        UNION
+        SELECT DISTINCT account_id
+        FROM deleted_credit_topups
+      ),
+      recomputed_credit_accounts AS (
+        SELECT
+          accounts.id AS account_id,
+          COALESCE(
+            SUM(
+              CASE
+                WHEN entries.kind = 'topup' THEN entries.amount::numeric
+                WHEN entries.kind = 'reserve' THEN -entries.amount::numeric
+                WHEN entries.kind = 'release' THEN entries.amount::numeric
+                ELSE 0::numeric
+              END
+            ),
+            0::numeric
+          )::text AS available_amount,
+          COALESCE(
+            SUM(
+              CASE
+                WHEN entries.kind = 'reserve' THEN entries.amount::numeric
+                WHEN entries.kind IN ('capture', 'release') THEN -entries.amount::numeric
+                ELSE 0::numeric
+              END
+            ),
+            0::numeric
+          )::text AS reserved_amount
+        FROM credit_accounts accounts
+        LEFT JOIN credit_ledger_entries entries
+          ON entries.account_id = accounts.id
+        WHERE accounts.id IN (
+          SELECT account_id
+          FROM affected_credit_accounts
+        )
+        GROUP BY accounts.id
+      )
+      UPDATE credit_accounts
+      SET
+        available_amount = recomputed_credit_accounts.available_amount,
+        reserved_amount = recomputed_credit_accounts.reserved_amount,
+        updated_at = NOW()
+      FROM recomputed_credit_accounts
+      WHERE credit_accounts.id = recomputed_credit_accounts.account_id;
+
       CREATE UNIQUE INDEX IF NOT EXISTS credit_topup_entries_service_payment_idx
       ON credit_ledger_entries(service_id, payment_id)
       WHERE kind = 'topup' AND payment_id IS NOT NULL;
