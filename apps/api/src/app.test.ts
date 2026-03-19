@@ -749,6 +749,7 @@ describe("marketplace api", () => {
       accessGrants: Map<string, unknown>;
     }).accessGrants;
     accessGrants.delete(`job:${jobToken}:${buyer.address}`);
+    await store.completeJob(jobToken, { done: true });
 
     const replayed = await request(app)
       .post("/api/mock/async-report")
@@ -757,6 +758,7 @@ describe("marketplace api", () => {
       .send({ topic: "market depth", delayMs: 60_000 });
 
     expect(replayed.status).toBe(202);
+    expect(replayed.body).toEqual(accepted.body);
 
     const challenge = await request(app)
       .post("/auth/challenge")

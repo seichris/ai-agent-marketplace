@@ -2502,11 +2502,7 @@ async function replayExistingResponse(
         routeId: record.routeId
       }
     });
-    const job = await store.getJob(record.jobToken);
-    return res.status(202).set(record.responseHeaders).json({
-      jobToken: record.jobToken,
-      status: job?.status ?? "pending"
-    });
+    return res.status(record.responseStatusCode).set(record.responseHeaders).json(record.responseBody);
   }
 
   return res.status(record.responseStatusCode).set(record.responseHeaders).json(record.responseBody);
