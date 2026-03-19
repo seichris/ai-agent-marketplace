@@ -62,9 +62,9 @@ function ProviderServicesDashboardInner({
     name: "",
     tagline: "",
     about: "",
-    categories: "Research",
+    categories: "",
     promptIntro: "",
-    setupInstructions: "Review the service docs.\nCall the paid endpoints with a funded Fast wallet.",
+    setupInstructions: "",
     websiteUrl: "",
     payoutWallet: ""
   });
@@ -188,6 +188,7 @@ function ProviderServicesDashboardInner({
                   value={form.name}
                   minLength={2}
                   maxLength={120}
+                  placeholder="Test Service 1"
                   onChange={(event) => setForm((current) => ({ ...current, name: event.target.value }))}
                   required
                 />
@@ -199,6 +200,7 @@ function ProviderServicesDashboardInner({
                   value={form.tagline}
                   minLength={5}
                   maxLength={240}
+                  placeholder="Providing data for testing"
                   onChange={(event) => setForm((current) => ({ ...current, tagline: event.target.value }))}
                   required
                 />
@@ -214,6 +216,7 @@ function ProviderServicesDashboardInner({
                   minLength={3}
                   maxLength={64}
                   pattern="^[a-z0-9-]{3,64}$"
+                  placeholder="test-service-1"
                   onChange={(event) => setForm((current) => ({ ...current, slug: event.target.value }))}
                   required
                 />
@@ -226,6 +229,7 @@ function ProviderServicesDashboardInner({
                   minLength={3}
                   maxLength={64}
                   pattern="^[a-z0-9-]{3,64}$"
+                  placeholder="test-service"
                   onChange={(event) => setForm((current) => ({ ...current, apiNamespace: event.target.value }))}
                   required
                 />
@@ -239,6 +243,7 @@ function ProviderServicesDashboardInner({
                 value={form.about}
                 minLength={20}
                 maxLength={4000}
+                placeholder="Providing data to users through a Fast-native paid API."
                 onChange={(event) => setForm((current) => ({ ...current, about: event.target.value }))}
                 required
               />
@@ -250,6 +255,7 @@ function ProviderServicesDashboardInner({
                 Categories
                 <Input
                   value={form.categories}
+                  placeholder="Research, Finance"
                   onChange={(event) => setForm((current) => ({ ...current, categories: event.target.value }))}
                 />
                 {fieldErrors.categories ? <span className="text-xs text-destructive">{fieldErrors.categories}</span> : null}
@@ -272,6 +278,7 @@ function ProviderServicesDashboardInner({
                 value={form.promptIntro}
                 minLength={10}
                 maxLength={500}
+                placeholder='I want to use the "Test Service 1" service on Fast Marketplace.'
                 onChange={(event) => setForm((current) => ({ ...current, promptIntro: event.target.value }))}
               />
               <span className="text-xs text-muted-foreground">
@@ -284,6 +291,7 @@ function ProviderServicesDashboardInner({
               Setup instructions
               <Textarea
                 value={form.setupInstructions}
+                placeholder={"Review the service docs.\nCall the paid endpoints with a funded Fast wallet."}
                 onChange={(event) => setForm((current) => ({ ...current, setupInstructions: event.target.value }))}
               />
               {fieldErrors.setupInstructions ? <span className="text-xs text-destructive">{fieldErrors.setupInstructions}</span> : null}
@@ -293,6 +301,7 @@ function ProviderServicesDashboardInner({
               Payout wallet
               <Input
                 value={form.payoutWallet}
+                placeholder="fast1rv8wsdd5pnkit4u637g2yj4tpuyq26rzw8380rfapnsnljz7v3tqv4ajuq"
                 onChange={(event) => setForm((current) => ({ ...current, payoutWallet: event.target.value }))}
                 required
               />

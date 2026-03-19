@@ -431,66 +431,138 @@ function EndpointDraftFields({
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
           Operation slug
-          <Input value={state.operation} onChange={(event) => onChange((current) => ({ ...current, operation: event.target.value }))} />
+          <Input
+            value={state.operation}
+            placeholder="quote-price"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, operation: event.target.value }))}
+          />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Price
-          <Input value={state.price} onChange={(event) => onChange((current) => ({ ...current, price: event.target.value }))} />
+          <Input
+            value={state.price}
+            placeholder="$0.25"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, price: event.target.value }))}
+          />
         </label>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
           Title
-          <Input value={state.title} onChange={(event) => onChange((current) => ({ ...current, title: event.target.value }))} />
+          <Input
+            value={state.title}
+            placeholder="Get token quote"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, title: event.target.value }))}
+          />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Upstream base URL
-          <Input value={state.upstreamBaseUrl} onChange={(event) => onChange((current) => ({ ...current, upstreamBaseUrl: event.target.value }))} />
+          <Input
+            value={state.upstreamBaseUrl}
+            type="url"
+            placeholder="https://api.example.com"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, upstreamBaseUrl: event.target.value }))}
+          />
         </label>
       </div>
       <label className="grid gap-2 text-sm font-medium">
         Description
-        <Textarea value={state.description} onChange={(event) => onChange((current) => ({ ...current, description: event.target.value }))} />
+        <Textarea
+          value={state.description}
+          placeholder="Return a live quote for a requested trading symbol."
+          required
+          onChange={(event) => onChange((current) => ({ ...current, description: event.target.value }))}
+        />
       </label>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
           Upstream path
-          <Input value={state.upstreamPath} onChange={(event) => onChange((current) => ({ ...current, upstreamPath: event.target.value }))} />
+          <Input
+            value={state.upstreamPath}
+            placeholder="/v1/quote"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, upstreamPath: event.target.value }))}
+          />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Auth mode
-          <Input value={state.upstreamAuthMode} onChange={(event) => onChange((current) => ({ ...current, upstreamAuthMode: event.target.value as EndpointFormState["upstreamAuthMode"] }))} />
+          <Input
+            value={state.upstreamAuthMode}
+            placeholder="none"
+            required
+            onChange={(event) => onChange((current) => ({ ...current, upstreamAuthMode: event.target.value as EndpointFormState["upstreamAuthMode"] }))}
+          />
         </label>
       </div>
       <div className="grid gap-4 md:grid-cols-2">
         <label className="grid gap-2 text-sm font-medium">
           Header name
-          <Input value={state.upstreamAuthHeaderName} onChange={(event) => onChange((current) => ({ ...current, upstreamAuthHeaderName: event.target.value }))} />
+          <Input
+            value={state.upstreamAuthHeaderName}
+            placeholder="X-Provider-Key"
+            onChange={(event) => onChange((current) => ({ ...current, upstreamAuthHeaderName: event.target.value }))}
+          />
         </label>
         <label className="grid gap-2 text-sm font-medium">
           Upstream secret
-          <Input value={state.upstreamSecret} onChange={(event) => onChange((current) => ({ ...current, upstreamSecret: event.target.value }))} placeholder="leave blank to keep current" />
+          <Input
+            value={state.upstreamSecret}
+            placeholder="leave blank to keep current or paste a new secret"
+            onChange={(event) => onChange((current) => ({ ...current, upstreamSecret: event.target.value }))}
+          />
         </label>
       </div>
       <label className="grid gap-2 text-sm font-medium">
         Usage notes
-        <Textarea value={state.usageNotes} onChange={(event) => onChange((current) => ({ ...current, usageNotes: event.target.value }))} />
+        <Textarea
+          value={state.usageNotes}
+          placeholder="Send a symbol like FAST or BTC-USD. Paid calls return 402 first, then succeed after wallet payment."
+          onChange={(event) => onChange((current) => ({ ...current, usageNotes: event.target.value }))}
+        />
       </label>
       <label className="grid gap-2 text-sm font-medium">
         Request schema JSON
-        <Textarea value={state.requestSchemaJson} onChange={(event) => onChange((current) => ({ ...current, requestSchemaJson: event.target.value }))} className="min-h-40 font-mono" />
+        <Textarea
+          value={state.requestSchemaJson}
+          placeholder={REQUEST_SCHEMA_PLACEHOLDER}
+          required
+          onChange={(event) => onChange((current) => ({ ...current, requestSchemaJson: event.target.value }))}
+          className="min-h-40 font-mono"
+        />
       </label>
       <label className="grid gap-2 text-sm font-medium">
         Response schema JSON
-        <Textarea value={state.responseSchemaJson} onChange={(event) => onChange((current) => ({ ...current, responseSchemaJson: event.target.value }))} className="min-h-40 font-mono" />
+        <Textarea
+          value={state.responseSchemaJson}
+          placeholder={RESPONSE_SCHEMA_PLACEHOLDER}
+          required
+          onChange={(event) => onChange((current) => ({ ...current, responseSchemaJson: event.target.value }))}
+          className="min-h-40 font-mono"
+        />
       </label>
       <label className="grid gap-2 text-sm font-medium">
         Request example JSON
-        <Textarea value={state.requestExample} onChange={(event) => onChange((current) => ({ ...current, requestExample: event.target.value }))} className="min-h-32 font-mono" />
+        <Textarea
+          value={state.requestExample}
+          placeholder={REQUEST_EXAMPLE_PLACEHOLDER}
+          required
+          onChange={(event) => onChange((current) => ({ ...current, requestExample: event.target.value }))}
+          className="min-h-32 font-mono"
+        />
       </label>
       <label className="grid gap-2 text-sm font-medium">
         Response example JSON
-        <Textarea value={state.responseExample} onChange={(event) => onChange((current) => ({ ...current, responseExample: event.target.value }))} className="min-h-32 font-mono" />
+        <Textarea
+          value={state.responseExample}
+          placeholder={RESPONSE_EXAMPLE_PLACEHOLDER}
+          required
+          onChange={(event) => onChange((current) => ({ ...current, responseExample: event.target.value }))}
+          className="min-h-32 font-mono"
+        />
       </label>
     </>
   );
@@ -518,19 +590,53 @@ function defaultEndpointFormState(): EndpointFormState {
     operation: "",
     title: "",
     description: "",
-    price: "$0.01",
-    requestSchemaJson: JSON.stringify({ type: "object", properties: {}, additionalProperties: false }, null, 2),
-    responseSchemaJson: JSON.stringify({ type: "object", properties: {}, additionalProperties: true }, null, 2),
-    requestExample: JSON.stringify({}, null, 2),
-    responseExample: JSON.stringify({}, null, 2),
+    price: "",
+    requestSchemaJson: "",
+    responseSchemaJson: "",
+    requestExample: "",
+    responseExample: "",
     usageNotes: "",
     upstreamBaseUrl: "",
-    upstreamPath: "/",
+    upstreamPath: "",
     upstreamAuthMode: "none",
     upstreamAuthHeaderName: "",
     upstreamSecret: ""
   };
 }
+
+const REQUEST_SCHEMA_PLACEHOLDER = `{
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string"
+    }
+  },
+  "required": ["symbol"],
+  "additionalProperties": false
+}`;
+
+const RESPONSE_SCHEMA_PLACEHOLDER = `{
+  "type": "object",
+  "properties": {
+    "symbol": {
+      "type": "string"
+    },
+    "price": {
+      "type": "number"
+    }
+  },
+  "required": ["symbol", "price"],
+  "additionalProperties": false
+}`;
+
+const REQUEST_EXAMPLE_PLACEHOLDER = `{
+  "symbol": "FAST"
+}`;
+
+const RESPONSE_EXAMPLE_PLACEHOLDER = `{
+  "symbol": "FAST",
+  "price": 42.5
+}`;
 
 function endpointToFormState(endpoint: {
   operation: string;
