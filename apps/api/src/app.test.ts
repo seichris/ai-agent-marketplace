@@ -3,7 +3,11 @@ import { FastProvider, FastWallet } from "@fastxyz/sdk";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { InMemoryMarketplaceStore, verifyMarketplaceIdentityHeaders } from "@marketplace/shared";
+import {
+  InMemoryMarketplaceStore,
+  verifyMarketplaceIdentityHeaders,
+  type ProviderExecuteContext
+} from "@marketplace/shared";
 
 import { createMarketplaceApi } from "./app.js";
 
@@ -53,9 +57,16 @@ async function createSiteSession(app: Express, wallet: Awaited<ReturnType<typeof
   return session.body.accessToken as string;
 }
 
-async function createTestApp(input: { tavilyApiKey?: string | null } = {}) {
+async function createTestApp(
+  input: {
+    tavilyApiKey?: string | null;
+    store?: InMemoryMarketplaceStore;
+    providers?: Parameters<typeof createMarketplaceApi>[0]["providers"];
+    refundService?: Parameters<typeof createMarketplaceApi>[0]["refundService"];
+  } = {}
+) {
   const buyer = await createTestWallet();
-  const store = new InMemoryMarketplaceStore();
+  const store = input.store ?? new InMemoryMarketplaceStore();
   const app = createMarketplaceApi({
     store,
     payTo: buyer.address,
@@ -70,11 +81,14 @@ async function createTestApp(input: { tavilyApiKey?: string | null } = {}) {
         };
       }
     },
-    refundService: {
-      async issueRefund() {
-        return { txHash: "0xrefund" };
-      }
-    },
+    refundService:
+      input.refundService ??
+      {
+        async issueRefund() {
+          return { txHash: "0xrefund" };
+        }
+      },
+    providers: input.providers,
     webBaseUrl: "https://fast.8o.vc",
     tavilyApiKey: input.tavilyApiKey === undefined ? "tvly-test-key" : (input.tavilyApiKey ?? undefined)
   });
@@ -451,6 +465,122 @@ describe("marketplace api", () => {
     expect(conflict.status).toBe(409);
   });
 
+  it("recovers stale pending sync payments with a refreshed recovery lease and stable request id", async () => {
+    class FlakySyncStore extends InMemoryMarketplaceStore {
+      private remainingCompletedWriteFailures = 2;
+
+      override async saveSyncIdempotency(input: Parameters<InMemoryMarketplaceStore["saveSyncIdempotency"]>[0]) {
+        if (this.remainingCompletedWriteFailures > 0 && input.statusCode >= 200 && input.statusCode < 400) {
+          this.remainingCompletedWriteFailures -= 1;
+          throw new Error("sync idempotency write failed");
+        }
+
+        return super.saveSyncIdempotency(input);
+      }
+    }
+
+    const store = new FlakySyncStore();
+    const requestIds: string[] = [];
+    const { app } = await createTestApp({
+      store,
+      providers: {
+        mock: {
+          async execute(context: ProviderExecuteContext) {
+            requestIds.push(context.requestId);
+            return {
+              kind: "sync" as const,
+              statusCode: 200,
+              body: {
+                ok: true,
+                requestId: context.requestId
+              }
+            };
+          },
+          async poll() {
+            return {
+              status: "completed" as const,
+              body: {}
+            };
+          }
+        }
+      }
+    });
+
+    const first = await request(app)
+      .post("/api/mock/quick-insight")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_sync_recovery_1")
+      .send({ query: "alpha" });
+
+    expect(first.status).toBe(500);
+    expect(requestIds).toHaveLength(1);
+
+    const second = await request(app)
+      .post("/api/mock/quick-insight")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_sync_recovery_1")
+      .send({ query: "alpha" });
+
+    expect(second.status).toBe(202);
+    expect(requestIds).toHaveLength(1);
+
+    const idempotencyByPaymentId = (store as unknown as {
+      idempotencyByPaymentId: Map<string, {
+        updatedAt: string;
+      }>;
+    }).idempotencyByPaymentId;
+    const pending = idempotencyByPaymentId.get("payment_sync_recovery_1");
+    if (!pending) {
+      throw new Error("Missing pending idempotency record.");
+    }
+    idempotencyByPaymentId.set("payment_sync_recovery_1", {
+      ...pending,
+      updatedAt: new Date(Date.now() - 20_000).toISOString()
+    });
+
+    const firstRecoveryAttempt = await request(app)
+      .post("/api/mock/quick-insight")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_sync_recovery_1")
+      .send({ query: "alpha" });
+
+    expect(firstRecoveryAttempt.status).toBe(500);
+    expect(requestIds).toHaveLength(2);
+    expect(new Set(requestIds).size).toBe(1);
+
+    const third = await request(app)
+      .post("/api/mock/quick-insight")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_sync_recovery_1")
+      .send({ query: "alpha" });
+
+    expect(third.status).toBe(202);
+    expect(requestIds).toHaveLength(2);
+
+    const refreshedPending = idempotencyByPaymentId.get("payment_sync_recovery_1");
+    if (!refreshedPending) {
+      throw new Error("Missing refreshed pending idempotency record.");
+    }
+    idempotencyByPaymentId.set("payment_sync_recovery_1", {
+      ...refreshedPending,
+      updatedAt: new Date(Date.now() - 20_000).toISOString()
+    });
+
+    const recovered = await request(app)
+      .post("/api/mock/quick-insight")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_sync_recovery_1")
+      .send({ query: "alpha" });
+
+    expect(recovered.status).toBe(200);
+    expect(requestIds).toHaveLength(3);
+    expect(new Set(requestIds).size).toBe(1);
+
+    const record = await store.getIdempotencyByPaymentId("payment_sync_recovery_1");
+    expect(record?.executionStatus).toBe("completed");
+    expect(record?.requestId).toBe(requestIds[0]);
+  });
+
   it("creates an async job and lets the paying wallet poll it for free", async () => {
     const { app, buyer, store } = await createTestApp();
 
@@ -498,6 +628,108 @@ describe("marketplace api", () => {
     expect(job?.payoutSplit.marketplaceAmount).toBe("150000");
     expect(job?.payoutSplit.providerAmount).toBe("0");
     expect(job?.payoutSplit.providerAccountId).toBe("provider_marketplace");
+  });
+
+  it("recovers a stale pending async acceptance without changing the marketplace request id", async () => {
+    class FlakyAsyncStore extends InMemoryMarketplaceStore {
+      private failNextAcceptanceWrite = true;
+
+      override async saveAsyncAcceptance(input: Parameters<InMemoryMarketplaceStore["saveAsyncAcceptance"]>[0]) {
+        if (this.failNextAcceptanceWrite) {
+          this.failNextAcceptanceWrite = false;
+          throw new Error("async acceptance write failed");
+        }
+
+        return super.saveAsyncAcceptance(input);
+      }
+    }
+
+    const store = new FlakyAsyncStore();
+    const requestIds: string[] = [];
+    const { app, buyer } = await createTestApp({
+      store,
+      providers: {
+        mock: {
+          async execute(context: ProviderExecuteContext) {
+            requestIds.push(context.requestId);
+            return {
+              kind: "async" as const,
+              providerJobId: `provider_${context.requestId}`,
+              pollAfterMs: 5_000,
+              state: {
+                requestId: context.requestId
+              }
+            };
+          },
+          async poll() {
+            return {
+              status: "pending" as const,
+              pollAfterMs: 5_000,
+              state: {}
+            };
+          }
+        }
+      }
+    });
+
+    const first = await request(app)
+      .post("/api/mock/async-report")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_async_recovery_1")
+      .send({ topic: "market depth", delayMs: 60_000 });
+
+    expect(first.status).toBe(500);
+    expect(requestIds).toHaveLength(1);
+
+    const second = await request(app)
+      .post("/api/mock/async-report")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_async_recovery_1")
+      .send({ topic: "market depth", delayMs: 60_000 });
+
+    expect(second.status).toBe(202);
+    expect(second.body.status).toBe("processing");
+    expect(requestIds).toHaveLength(1);
+
+    const idempotencyByPaymentId = (store as unknown as {
+      idempotencyByPaymentId: Map<string, {
+        updatedAt: string;
+      }>;
+    }).idempotencyByPaymentId;
+    const pending = idempotencyByPaymentId.get("payment_async_recovery_1");
+    if (!pending) {
+      throw new Error("Missing pending async idempotency record.");
+    }
+    idempotencyByPaymentId.set("payment_async_recovery_1", {
+      ...pending,
+      updatedAt: new Date(Date.now() - 20_000).toISOString()
+    });
+
+    const recovered = await request(app)
+      .post("/api/mock/async-report")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_async_recovery_1")
+      .send({ topic: "market depth", delayMs: 60_000 });
+
+    expect(recovered.status).toBe(202);
+    expect(recovered.body.jobToken).toBeDefined();
+    expect(requestIds).toHaveLength(2);
+    expect(new Set(requestIds).size).toBe(1);
+
+    const challenge = await request(app)
+      .post("/auth/challenge")
+      .send({
+        wallet: buyer.address,
+        resourceType: "job",
+        resourceId: recovered.body.jobToken
+      });
+
+    expect(challenge.status).toBe(200);
+
+    const record = await store.getIdempotencyByPaymentId("payment_async_recovery_1");
+    expect(record?.executionStatus).toBe("completed");
+    expect(record?.requestId).toBe(requestIds[0]);
+    expect(record?.jobToken).toBe(recovered.body.jobToken);
   });
 
   it("repairs a missing async job access grant when replaying an existing payment", async () => {
@@ -771,6 +1003,174 @@ describe("marketplace api", () => {
     expect(record?.payoutSplit.marketplaceAmount).toBe("0");
   });
 
+  it("does not re-execute stale pending self-serve HTTP charges", async () => {
+    class FlakyProviderStore extends InMemoryMarketplaceStore {
+      private remainingCompletedWriteFailures = 1;
+
+      override async saveSyncIdempotency(input: Parameters<InMemoryMarketplaceStore["saveSyncIdempotency"]>[0]) {
+        if (this.remainingCompletedWriteFailures > 0 && input.statusCode >= 200 && input.statusCode < 400) {
+          this.remainingCompletedWriteFailures -= 1;
+          throw new Error("sync idempotency write failed");
+        }
+
+        return super.saveSyncIdempotency(input);
+      }
+    }
+
+    const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
+    const store = new FlakyProviderStore();
+    const { app } = await createTestApp({ store });
+    const providerToken = await createSiteSession(app, providerWallet);
+
+    const profile = await request(app)
+      .post("/provider/me")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        displayName: "Signal Labs",
+        websiteUrl: "https://provider.example.com"
+      });
+
+    expect(profile.status).toBe(201);
+
+    const createdService = await request(app)
+      .post("/provider/services")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        slug: "signal-labs-recovery",
+        apiNamespace: "signals-recovery",
+        name: "Signal Labs Recovery",
+        tagline: "Recovery safety checks",
+        about: "Provider-authored signal endpoints.",
+        categories: ["Research"],
+        promptIntro: 'I want to use the "Signal Labs Recovery" service on Fast Marketplace.',
+        setupInstructions: ["Use a funded Fast wallet.", "Call the marketplace proxy route."],
+        websiteUrl: "https://provider.example.com",
+        payoutWallet: providerWallet.address
+      });
+
+    expect(createdService.status).toBe(201);
+    const serviceId = createdService.body.service.id as string;
+
+    const createdEndpoint = await request(app)
+      .post(`/provider/services/${serviceId}/endpoints`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        operation: "quote",
+        title: "Quote",
+        description: "Return a single quote snapshot.",
+        billingType: "fixed_x402",
+        price: "$0.25",
+        mode: "sync",
+        requestSchemaJson: {
+          type: "object",
+          properties: {
+            symbol: { type: "string", minLength: 1 }
+          },
+          required: ["symbol"],
+          additionalProperties: false
+        },
+        responseSchemaJson: {
+          type: "object",
+          properties: {
+            symbol: { type: "string" },
+            price: { type: "number" }
+          },
+          required: ["symbol", "price"],
+          additionalProperties: false
+        },
+        requestExample: {
+          symbol: "FAST"
+        },
+        responseExample: {
+          symbol: "FAST",
+          price: 42.5
+        },
+        upstreamBaseUrl: "https://provider.example.com",
+        upstreamPath: "/api/quote",
+        upstreamAuthMode: "none"
+      });
+
+    expect(createdEndpoint.status).toBe(201);
+
+    const verificationChallenge = await request(app)
+      .post(`/provider/services/${serviceId}/verification-challenge`)
+      .set("Authorization", `Bearer ${providerToken}`);
+
+    expect(verificationChallenge.status).toBe(200);
+
+    let upstreamExecutions = 0;
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === verificationChallenge.body.expectedUrl) {
+        return new Response(verificationChallenge.body.token, { status: 200 });
+      }
+
+      if (url === "https://provider.example.com/api/quote") {
+        upstreamExecutions += 1;
+        return new Response(JSON.stringify({ symbol: "FAST", price: 42.5 }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    await request(app)
+      .post(`/provider/services/${serviceId}/verify`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    await request(app)
+      .post(`/provider/services/${serviceId}/submit`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    await request(app)
+      .post(`/internal/provider-services/${serviceId}/publish`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        reviewerIdentity: "ops@test"
+      });
+
+    const first = await request(app)
+      .post("/api/signals-recovery/quote")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_provider_sync_recovery_1")
+      .send({ symbol: "FAST" });
+
+    expect(first.status).toBe(500);
+    expect(upstreamExecutions).toBe(1);
+
+    const idempotencyByPaymentId = (store as unknown as {
+      idempotencyByPaymentId: Map<string, {
+        updatedAt: string;
+      }>;
+    }).idempotencyByPaymentId;
+    const pending = idempotencyByPaymentId.get("payment_provider_sync_recovery_1");
+    if (!pending) {
+      throw new Error("Missing pending provider recovery record.");
+    }
+    idempotencyByPaymentId.set("payment_provider_sync_recovery_1", {
+      ...pending,
+      updatedAt: new Date(Date.now() - 20_000).toISOString()
+    });
+
+    const second = await request(app)
+      .post("/api/signals-recovery/quote")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_provider_sync_recovery_1")
+      .send({ symbol: "FAST" });
+
+    expect(second.status).toBe(409);
+    expect(second.body.error).toContain("manual recovery");
+    expect(upstreamExecutions).toBe(1);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://provider.example.com/api/quote",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+  });
+
   it("supports variable topups and prepaid-credit execution with signed provider identity headers", async () => {
     const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
     const { app, buyer, store } = await createTestApp();
@@ -1023,6 +1423,15 @@ describe("marketplace api", () => {
         method: "POST"
       })
     );
+
+    const toppedUpReplay = await request(app)
+      .post("/api/orders/topup")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_orders_topup_1")
+      .send({ amount: "25" });
+
+    expect(toppedUpReplay.status).toBe(200);
+    expect(toppedUpReplay.body).toEqual(toppedUp.body);
 
     const creditAccount = await store.getCreditAccount(serviceId, buyer.address, "fastUSDC");
     expect(creditAccount?.availableAmount).toBe("12500000");

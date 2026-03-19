@@ -490,6 +490,8 @@ export interface ProviderPayoutInput {
   amount: string;
 }
 
+export type IdempotencyExecutionStatus = "pending" | "completed";
+
 export interface IdempotencyRecord {
   paymentId: string;
   normalizedRequestHash: string;
@@ -505,6 +507,8 @@ export interface IdempotencyRecord {
   responseBody: unknown;
   responseHeaders: Record<string, string>;
   providerPayoutSourceKind?: ProviderPayoutSourceKind | null;
+  executionStatus: IdempotencyExecutionStatus;
+  requestId?: string | null;
   jobToken?: string;
   createdAt: string;
   updatedAt: string;
@@ -654,6 +658,7 @@ export interface SaveSyncIdempotencyInput {
   statusCode: number;
   body: unknown;
   headers?: Record<string, string>;
+  requestId?: string | null;
   providerPayoutSourceKind?: ProviderPayoutSourceKind | null;
 }
 
@@ -672,11 +677,52 @@ export interface SaveAsyncAcceptanceInput {
   providerState?: Record<string, unknown>;
   responseBody: unknown;
   responseHeaders?: Record<string, string>;
+  requestId?: string | null;
+}
+
+export interface ClaimPaymentExecutionInput {
+  paymentId: string;
+  normalizedRequestHash: string;
+  buyerWallet: string;
+  routeId: string;
+  routeVersion: string;
+  quotedPrice: string;
+  payoutSplit: PersistedPayoutSplit;
+  paymentPayload: string;
+  facilitatorResponse: unknown;
+  responseKind: "sync" | "job";
+  requestId: string;
+  jobToken?: string;
+  responseBody?: unknown;
+  responseHeaders?: Record<string, string>;
+}
+
+export interface ClaimPaymentExecutionResult {
+  record: IdempotencyRecord;
+  created: boolean;
+}
+
+export interface CompleteCreditTopupChargeInput {
+  paymentId: string;
+  normalizedRequestHash: string;
+  buyerWallet: string;
+  routeId: string;
+  routeVersion: string;
+  quotedPrice: string;
+  payoutSplit: PersistedPayoutSplit;
+  paymentPayload: string;
+  facilitatorResponse: unknown;
+  responseHeaders?: Record<string, string>;
+  requestId?: string | null;
+  serviceId: string;
+  metadata?: Record<string, unknown>;
 }
 
 export interface MarketplaceStore {
   ensureSchema(): Promise<void>;
   getIdempotencyByPaymentId(paymentId: string): Promise<IdempotencyRecord | null>;
+  claimPaymentExecution(input: ClaimPaymentExecutionInput): Promise<ClaimPaymentExecutionResult>;
+  touchPendingPaymentExecution(paymentId: string): Promise<IdempotencyRecord | null>;
   saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord>;
   saveAsyncAcceptance(input: SaveAsyncAcceptanceInput): Promise<{ idempotency: IdempotencyRecord; job: JobRecord }>;
   getJob(jobToken: string): Promise<JobRecord | null>;
@@ -709,11 +755,15 @@ export interface MarketplaceStore {
   markRefundSent(refundId: string, txHash: string): Promise<RefundRecord>;
   markRefundFailed(refundId: string, errorMessage: string): Promise<RefundRecord>;
   getRefundByJobToken(jobToken: string): Promise<RefundRecord | null>;
+  getRefundByPaymentId(paymentId: string): Promise<RefundRecord | null>;
   createProviderPayout(input: ProviderPayoutInput): Promise<ProviderPayoutRecord>;
   listRecoverableProviderPayouts(limit: number): Promise<ProviderPayoutInput[]>;
   listPendingProviderPayouts(limit: number): Promise<ProviderPayoutRecord[]>;
   markProviderPayoutSendFailure(payoutIds: string[], errorMessage: string): Promise<void>;
   markProviderPayoutsSent(payoutIds: string[], txHash: string): Promise<ProviderPayoutRecord[]>;
+  completeCreditTopupCharge(
+    input: CompleteCreditTopupChargeInput
+  ): Promise<{ idempotency: IdempotencyRecord; account: CreditAccountRecord; entry: CreditLedgerEntryRecord }>;
   createCreditTopup(input: {
     serviceId: string;
     buyerWallet: string;
@@ -722,6 +772,10 @@ export interface MarketplaceStore {
     paymentId: string;
     metadata?: Record<string, unknown>;
   }): Promise<{ account: CreditAccountRecord; entry: CreditLedgerEntryRecord }>;
+  getCreditTopupByPaymentId(
+    serviceId: string,
+    paymentId: string
+  ): Promise<{ account: CreditAccountRecord; entry: CreditLedgerEntryRecord } | null>;
   getCreditAccount(serviceId: string, buyerWallet: string, currency: MarketplaceTokenSymbol): Promise<CreditAccountRecord | null>;
   reserveCredit(input: {
     serviceId: string;

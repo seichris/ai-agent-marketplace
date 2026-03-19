@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 
 import { Pool } from "pg";
 
+import { rawToDecimalString } from "./amounts.js";
 import { createDraftRouteBilling, normalizeRouteBilling } from "./billing.js";
 import { getDefaultMarketplaceNetworkConfig } from "./network.js";
 import { hashProviderRuntimeKey } from "./provider-runtime.js";
@@ -14,6 +15,9 @@ import {
 } from "./seed.js";
 import type {
   AccessGrantRecord,
+  ClaimPaymentExecutionInput,
+  ClaimPaymentExecutionResult,
+  CompleteCreditTopupChargeInput,
   CreditAccountRecord,
   CreditLedgerEntryRecord,
   CreditReservationRecord,
@@ -118,7 +122,7 @@ function computeServiceAnalytics(input: {
 }): ServiceAnalytics {
   const routeIds = new Set(input.routeIds);
   const acceptedCalls = input.idempotencyRecords.filter((record) => {
-    if (!routeIds.has(record.routeId)) {
+    if (!routeIds.has(record.routeId) || record.executionStatus !== "completed") {
       return false;
     }
 
@@ -202,6 +206,55 @@ function creditTopupKey(serviceId: string, paymentId: string): string {
   return `${serviceId}:${paymentId}`;
 }
 
+function buildPendingPaymentExecutionRecord(input: ClaimPaymentExecutionInput, now: string): IdempotencyRecord {
+  return {
+    paymentId: input.paymentId,
+    normalizedRequestHash: input.normalizedRequestHash,
+    buyerWallet: input.buyerWallet,
+    routeId: input.routeId,
+    routeVersion: input.routeVersion,
+    quotedPrice: input.quotedPrice,
+    payoutSplit: clone(input.payoutSplit),
+    paymentPayload: input.paymentPayload,
+    facilitatorResponse: clone(input.facilitatorResponse),
+    responseKind: input.responseKind,
+    responseStatusCode: 202,
+    responseBody: clone(input.responseBody ?? { status: "processing" }),
+    responseHeaders: clone(input.responseHeaders ?? {}),
+    providerPayoutSourceKind: null,
+    executionStatus: "pending",
+    requestId: input.requestId,
+    jobToken: input.jobToken,
+    createdAt: now,
+    updatedAt: now
+  };
+}
+
+function buildStoredTopupResponseBody(input: {
+  routeId: string;
+  serviceId: string;
+  buyerWallet: string;
+  quotedPrice: string;
+  account: CreditAccountRecord;
+  entry: CreditLedgerEntryRecord;
+}) {
+  return {
+    routeId: input.routeId,
+    serviceId: input.serviceId,
+    wallet: input.buyerWallet,
+    topupAmount: rawToDecimalString(input.quotedPrice, 6),
+    account: {
+      ...clone(input.account),
+      availableAmountDecimal: rawToDecimalString(input.account.availableAmount, 6),
+      reservedAmountDecimal: rawToDecimalString(input.account.reservedAmount, 6)
+    },
+    entry: {
+      ...clone(input.entry),
+      amountDecimal: rawToDecimalString(input.entry.amount, 6)
+    }
+  };
+}
+
 export class InMemoryMarketplaceStore implements MarketplaceStore {
   private readonly idempotencyByPaymentId = new Map<string, IdempotencyRecord>();
   private readonly jobsByToken = new Map<string, JobRecord>();
@@ -280,8 +333,41 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     return clone(this.idempotencyByPaymentId.get(paymentId) ?? null);
   }
 
+  async claimPaymentExecution(input: ClaimPaymentExecutionInput): Promise<ClaimPaymentExecutionResult> {
+    const existing = this.idempotencyByPaymentId.get(input.paymentId);
+    if (existing) {
+      return {
+        record: clone(existing),
+        created: false
+      };
+    }
+
+    const record = buildPendingPaymentExecutionRecord(input, timestamp());
+    this.idempotencyByPaymentId.set(record.paymentId, record);
+
+    return {
+      record: clone(record),
+      created: true
+    };
+  }
+
+  async touchPendingPaymentExecution(paymentId: string): Promise<IdempotencyRecord | null> {
+    const existing = this.idempotencyByPaymentId.get(paymentId);
+    if (!existing || existing.executionStatus !== "pending") {
+      return clone(existing ?? null);
+    }
+
+    const updated: IdempotencyRecord = {
+      ...existing,
+      updatedAt: timestamp()
+    };
+    this.idempotencyByPaymentId.set(paymentId, updated);
+    return clone(updated);
+  }
+
   async saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord> {
     const now = timestamp();
+    const existing = this.idempotencyByPaymentId.get(input.paymentId);
     const record: IdempotencyRecord = {
       paymentId: input.paymentId,
       normalizedRequestHash: input.normalizedRequestHash,
@@ -297,7 +383,10 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       responseBody: clone(input.body),
       responseHeaders: clone(input.headers ?? {}),
       providerPayoutSourceKind: input.providerPayoutSourceKind ?? null,
-      createdAt: now,
+      executionStatus: "completed",
+      requestId: input.requestId ?? existing?.requestId ?? null,
+      jobToken: existing?.jobToken,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now
     };
 
@@ -307,6 +396,8 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
 
   async saveAsyncAcceptance(input: SaveAsyncAcceptanceInput): Promise<{ idempotency: IdempotencyRecord; job: JobRecord }> {
     const now = timestamp();
+    const existing = this.idempotencyByPaymentId.get(input.paymentId);
+
     const idempotency: IdempotencyRecord = {
       paymentId: input.paymentId,
       normalizedRequestHash: input.normalizedRequestHash,
@@ -322,13 +413,15 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       responseBody: clone(input.responseBody),
       responseHeaders: clone(input.responseHeaders ?? {}),
       providerPayoutSourceKind: null,
-      jobToken: input.jobToken,
-      createdAt: now,
+      executionStatus: "completed",
+      requestId: input.requestId ?? existing?.requestId ?? null,
+      jobToken: existing?.jobToken ?? input.jobToken,
+      createdAt: existing?.createdAt ?? now,
       updatedAt: now
     };
 
     const job: JobRecord = {
-      jobToken: input.jobToken,
+      jobToken: idempotency.jobToken ?? input.jobToken,
       paymentId: input.paymentId,
       routeId: input.route.routeId,
       provider: input.route.provider,
@@ -600,6 +693,10 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     return clone(this.refundsByJobToken.get(jobToken) ?? null);
   }
 
+  async getRefundByPaymentId(paymentId: string): Promise<RefundRecord | null> {
+    return clone(this.refundsByPaymentId.get(paymentId) ?? null);
+  }
+
   async createProviderPayout(input: ProviderPayoutInput): Promise<ProviderPayoutRecord> {
     const existing = Array.from(this.providerPayoutsById.values()).find(
       (record) => record.sourceKind === input.sourceKind && record.sourceId === input.sourceId
@@ -653,7 +750,8 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       }
 
       if (
-        record.responseKind !== "sync"
+        record.executionStatus !== "completed"
+        || record.responseKind !== "sync"
         || record.responseStatusCode < 200
         || record.responseStatusCode >= 400
         || !record.providerPayoutSourceKind
@@ -749,6 +847,138 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     return updated;
   }
 
+  async completeCreditTopupCharge(
+    input: CompleteCreditTopupChargeInput
+  ): Promise<{ idempotency: IdempotencyRecord; account: CreditAccountRecord; entry: CreditLedgerEntryRecord }> {
+    const now = timestamp();
+    const existingIdempotency = this.idempotencyByPaymentId.get(input.paymentId);
+    const topupLookupKey = creditTopupKey(input.serviceId, input.paymentId);
+    const existingEntryId = this.creditTopupEntryIdByPaymentKey.get(topupLookupKey);
+
+    let account: CreditAccountRecord;
+    let entry: CreditLedgerEntryRecord;
+
+    if (existingEntryId) {
+      const existingEntry = this.creditEntriesById.get(existingEntryId);
+      if (!existingEntry) {
+        throw new Error(`Credit top-up entry not found: ${topupLookupKey}`);
+      }
+      const existingAccount = this.creditAccountsById.get(existingEntry.accountId);
+      if (!existingAccount) {
+        throw new Error(`Credit account not found: ${existingEntry.accountId}`);
+      }
+      entry = clone(existingEntry);
+      account = clone(existingAccount);
+    } else {
+      const accountLookupKey = creditAccountKey(input.serviceId, input.buyerWallet, input.payoutSplit.currency);
+      const existingAccountId = this.creditAccountIdByKey.get(accountLookupKey);
+      const existingAccount = existingAccountId ? this.creditAccountsById.get(existingAccountId) ?? null : null;
+      account = existingAccount
+        ? {
+            ...clone(existingAccount),
+            availableAmount: (BigInt(existingAccount.availableAmount) + BigInt(input.quotedPrice)).toString(),
+            updatedAt: now
+          }
+        : {
+            id: randomUUID(),
+            serviceId: input.serviceId,
+            buyerWallet: input.buyerWallet,
+            currency: input.payoutSplit.currency,
+            availableAmount: input.quotedPrice,
+            reservedAmount: "0",
+            createdAt: now,
+            updatedAt: now
+          };
+      entry = {
+        id: randomUUID(),
+        accountId: account.id,
+        serviceId: input.serviceId,
+        buyerWallet: input.buyerWallet,
+        currency: input.payoutSplit.currency,
+        kind: "topup",
+        amount: input.quotedPrice,
+        reservationId: null,
+        paymentId: input.paymentId,
+        metadata: clone(input.metadata ?? {}),
+        createdAt: now
+      };
+    }
+
+    const responseBody = buildStoredTopupResponseBody({
+      routeId: input.routeId,
+      serviceId: input.serviceId,
+      buyerWallet: input.buyerWallet,
+      quotedPrice: input.quotedPrice,
+      account,
+      entry
+    });
+
+    const idempotency: IdempotencyRecord = {
+      paymentId: input.paymentId,
+      normalizedRequestHash: input.normalizedRequestHash,
+      buyerWallet: input.buyerWallet,
+      routeId: input.routeId,
+      routeVersion: input.routeVersion,
+      quotedPrice: input.quotedPrice,
+      payoutSplit: clone(input.payoutSplit),
+      paymentPayload: input.paymentPayload,
+      facilitatorResponse: clone(input.facilitatorResponse),
+      responseKind: "sync",
+      responseStatusCode: 200,
+      responseBody,
+      responseHeaders: clone(input.responseHeaders ?? {}),
+      providerPayoutSourceKind: "credit_topup",
+      executionStatus: "completed",
+      requestId: input.requestId ?? existingIdempotency?.requestId ?? null,
+      jobToken: existingIdempotency?.jobToken,
+      createdAt: existingIdempotency?.createdAt ?? now,
+      updatedAt: now
+    };
+
+    if (!existingEntryId) {
+      this.creditAccountsById.set(account.id, clone(account));
+      this.creditAccountIdByKey.set(
+        creditAccountKey(input.serviceId, input.buyerWallet, input.payoutSplit.currency),
+        account.id
+      );
+      this.creditEntriesById.set(entry.id, clone(entry));
+      this.creditTopupEntryIdByPaymentKey.set(topupLookupKey, entry.id);
+    }
+
+    if (BigInt(input.payoutSplit.providerAmount) > 0n && input.payoutSplit.providerWallet) {
+      const existingPayout = Array.from(this.providerPayoutsById.values()).find(
+        (record) => record.sourceKind === "credit_topup" && record.sourceId === input.paymentId
+      );
+      if (!existingPayout) {
+        const payout: ProviderPayoutRecord = {
+          id: randomUUID(),
+          sourceKind: "credit_topup",
+          sourceId: input.paymentId,
+          providerAccountId: input.payoutSplit.providerAccountId,
+          providerWallet: input.payoutSplit.providerWallet,
+          currency: input.payoutSplit.currency,
+          amount: input.payoutSplit.providerAmount,
+          status: "pending",
+          txHash: null,
+          sentAt: null,
+          attemptCount: 0,
+          lastError: null,
+          createdAt: now,
+          updatedAt: now
+        };
+        this.providerPayoutsById.set(payout.id, payout);
+      }
+    }
+
+    this.idempotencyByPaymentId.set(idempotency.paymentId, clone(idempotency));
+
+    return {
+      idempotency: clone(idempotency),
+      account: clone(account),
+      entry: clone(entry)
+    };
+  }
+
   async createCreditTopup(input: {
     serviceId: string;
     buyerWallet: string;
@@ -809,6 +1039,31 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     };
     this.creditEntriesById.set(entry.id, entry);
     this.creditTopupEntryIdByPaymentKey.set(creditTopupKey(input.serviceId, input.paymentId), entry.id);
+
+    return {
+      account: clone(account),
+      entry: clone(entry)
+    };
+  }
+
+  async getCreditTopupByPaymentId(
+    serviceId: string,
+    paymentId: string
+  ): Promise<{ account: CreditAccountRecord; entry: CreditLedgerEntryRecord } | null> {
+    const entryId = this.creditTopupEntryIdByPaymentKey.get(creditTopupKey(serviceId, paymentId));
+    if (!entryId) {
+      return null;
+    }
+
+    const entry = this.creditEntriesById.get(entryId);
+    if (!entry) {
+      return null;
+    }
+
+    const account = this.creditAccountsById.get(entry.accountId);
+    if (!account) {
+      return null;
+    }
 
     return {
       account: clone(account),
@@ -2024,6 +2279,12 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ALTER TABLE idempotency_records
       ADD COLUMN IF NOT EXISTS provider_payout_source_kind TEXT;
 
+      ALTER TABLE idempotency_records
+      ADD COLUMN IF NOT EXISTS execution_status TEXT NOT NULL DEFAULT 'completed';
+
+      ALTER TABLE idempotency_records
+      ADD COLUMN IF NOT EXISTS request_id TEXT;
+
       CREATE TABLE IF NOT EXISTS jobs (
         job_token TEXT PRIMARY KEY,
         payment_id TEXT NOT NULL REFERENCES idempotency_records(payment_id),
@@ -2905,14 +3166,109 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     return result.rowCount ? mapIdempotencyRow(result.rows[0]) : null;
   }
 
+  async claimPaymentExecution(input: ClaimPaymentExecutionInput): Promise<ClaimPaymentExecutionResult> {
+    try {
+      const result = await this.pool.query(
+        `
+        INSERT INTO idempotency_records (
+          payment_id, normalized_request_hash, buyer_wallet, route_id, route_version,
+          quoted_price, payout_split, payment_payload, facilitator_response, response_kind,
+          response_status_code, response_body, response_headers, provider_payout_source_kind,
+          execution_status, request_id, job_token
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, $10,
+          202, $11::jsonb, $12::jsonb, NULL, 'pending', $13, $14
+        )
+        RETURNING *
+        `,
+        [
+          input.paymentId,
+          input.normalizedRequestHash,
+          input.buyerWallet,
+          input.routeId,
+          input.routeVersion,
+          input.quotedPrice,
+          JSON.stringify(input.payoutSplit),
+          input.paymentPayload,
+          JSON.stringify(input.facilitatorResponse),
+          input.responseKind,
+          JSON.stringify(input.responseBody ?? { status: "processing" }),
+          JSON.stringify(input.responseHeaders ?? {}),
+          input.requestId,
+          input.jobToken ?? null
+        ]
+      );
+
+      return {
+        record: mapIdempotencyRow(result.rows[0]),
+        created: true
+      };
+    } catch (error) {
+      const pgError = error as { code?: string };
+      if (pgError.code !== "23505") {
+        throw error;
+      }
+
+      const existing = await this.getIdempotencyByPaymentId(input.paymentId);
+      if (!existing) {
+        throw error;
+      }
+
+      return {
+        record: existing,
+        created: false
+      };
+    }
+  }
+
+  async touchPendingPaymentExecution(paymentId: string): Promise<IdempotencyRecord | null> {
+    const result = await this.pool.query(
+      `
+      UPDATE idempotency_records
+      SET updated_at = NOW()
+      WHERE payment_id = $1
+        AND execution_status = 'pending'
+      RETURNING *
+      `,
+      [paymentId]
+    );
+    if (result.rowCount) {
+      return mapIdempotencyRow(result.rows[0]);
+    }
+
+    return this.getIdempotencyByPaymentId(paymentId);
+  }
+
   async saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord> {
     const result = await this.pool.query(
       `
       INSERT INTO idempotency_records (
         payment_id, normalized_request_hash, buyer_wallet, route_id, route_version,
         quoted_price, payout_split, payment_payload, facilitator_response, response_kind,
-        response_status_code, response_body, response_headers, provider_payout_source_kind
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, 'sync', $10, $11::jsonb, $12::jsonb, $13)
+        response_status_code, response_body, response_headers, provider_payout_source_kind,
+        execution_status, request_id, job_token
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, 'sync', $10, $11::jsonb, $12::jsonb, $13,
+        'completed', $14, NULL
+      )
+      ON CONFLICT (payment_id) DO UPDATE
+      SET
+        normalized_request_hash = EXCLUDED.normalized_request_hash,
+        buyer_wallet = EXCLUDED.buyer_wallet,
+        route_id = EXCLUDED.route_id,
+        route_version = EXCLUDED.route_version,
+        quoted_price = EXCLUDED.quoted_price,
+        payout_split = EXCLUDED.payout_split,
+        payment_payload = EXCLUDED.payment_payload,
+        facilitator_response = EXCLUDED.facilitator_response,
+        response_kind = 'sync',
+        response_status_code = EXCLUDED.response_status_code,
+        response_body = EXCLUDED.response_body,
+        response_headers = EXCLUDED.response_headers,
+        provider_payout_source_kind = EXCLUDED.provider_payout_source_kind,
+        execution_status = 'completed',
+        request_id = COALESCE(idempotency_records.request_id, EXCLUDED.request_id),
+        updated_at = NOW()
       RETURNING *
       `,
       [
@@ -2928,7 +3284,8 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         input.statusCode,
         JSON.stringify(input.body),
         JSON.stringify(input.headers ?? {}),
-        input.providerPayoutSourceKind ?? null
+        input.providerPayoutSourceKind ?? null,
+        input.requestId ?? null
       ]
     );
 
@@ -2945,8 +3302,26 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         INSERT INTO idempotency_records (
           payment_id, normalized_request_hash, buyer_wallet, route_id, route_version,
           quoted_price, payout_split, payment_payload, facilitator_response, response_kind,
-          response_status_code, response_body, response_headers, job_token
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, 'job', 202, $10::jsonb, $11::jsonb, $12)
+          response_status_code, response_body, response_headers, job_token, execution_status, request_id
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, 'job', 202, $10::jsonb, $11::jsonb, $12, 'completed', $13)
+        ON CONFLICT (payment_id) DO UPDATE
+        SET
+          normalized_request_hash = EXCLUDED.normalized_request_hash,
+          buyer_wallet = EXCLUDED.buyer_wallet,
+          route_id = EXCLUDED.route_id,
+          route_version = EXCLUDED.route_version,
+          quoted_price = EXCLUDED.quoted_price,
+          payout_split = EXCLUDED.payout_split,
+          payment_payload = EXCLUDED.payment_payload,
+          facilitator_response = EXCLUDED.facilitator_response,
+          response_kind = 'job',
+          response_status_code = 202,
+          response_body = EXCLUDED.response_body,
+          response_headers = EXCLUDED.response_headers,
+          job_token = COALESCE(idempotency_records.job_token, EXCLUDED.job_token),
+          execution_status = 'completed',
+          request_id = COALESCE(idempotency_records.request_id, EXCLUDED.request_id),
+          updated_at = NOW()
         RETURNING *
         `,
         [
@@ -2961,9 +3336,12 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           JSON.stringify(input.facilitatorResponse),
           JSON.stringify(input.responseBody),
           JSON.stringify(input.responseHeaders ?? {}),
-          input.jobToken
+          input.jobToken,
+          input.requestId ?? null
         ]
       );
+
+      const persistedIdempotency = mapIdempotencyRow(idempotencyResult.rows[0]);
 
       const jobResult = await client.query(
         `
@@ -2972,10 +3350,12 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           payout_split, provider_job_id, request_body, route_snapshot, provider_state, status, result_body, error_message,
           refund_status, refund_id
         ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11::jsonb, $12::jsonb, 'pending', NULL, NULL, 'not_required', NULL)
+        ON CONFLICT (job_token) DO UPDATE
+        SET updated_at = jobs.updated_at
         RETURNING *
         `,
         [
-          input.jobToken,
+          persistedIdempotency.jobToken ?? input.jobToken,
           input.paymentId,
           input.route.routeId,
           input.route.provider,
@@ -2998,7 +3378,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         `,
         [
           randomUUID(),
-          input.jobToken,
+          persistedIdempotency.jobToken ?? input.jobToken,
           input.buyerWallet,
           input.paymentId,
           JSON.stringify({
@@ -3009,7 +3389,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
       await client.query("COMMIT");
       return {
-        idempotency: mapIdempotencyRow(idempotencyResult.rows[0]),
+        idempotency: persistedIdempotency,
         job: mapJobRow(jobResult.rows[0])
       };
     } catch (error) {
@@ -3243,6 +3623,11 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     return result.rowCount ? mapRefundRow(result.rows[0]) : null;
   }
 
+  async getRefundByPaymentId(paymentId: string): Promise<RefundRecord | null> {
+    const result = await this.pool.query("SELECT * FROM refunds WHERE payment_id = $1", [paymentId]);
+    return result.rowCount ? mapRefundRow(result.rows[0]) : null;
+  }
+
   async createProviderPayout(input: ProviderPayoutInput): Promise<ProviderPayoutRecord> {
     const result = await this.pool.query(
       `
@@ -3283,7 +3668,8 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         payout_split->>'currency' AS currency,
         payout_split->>'providerAmount' AS amount
       FROM idempotency_records
-      WHERE response_kind = 'sync'
+      WHERE execution_status = 'completed'
+        AND response_kind = 'sync'
         AND response_status_code >= 200
         AND response_status_code < 400
         AND provider_payout_source_kind IS NOT NULL
@@ -3384,6 +3770,182 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       [payoutIds, txHash]
     );
     return result.rows.map(mapProviderPayoutRow);
+  }
+
+  async completeCreditTopupCharge(
+    input: CompleteCreditTopupChargeInput
+  ): Promise<{ idempotency: IdempotencyRecord; account: CreditAccountRecord; entry: CreditLedgerEntryRecord }> {
+    const client = await this.pool.connect();
+    try {
+      await client.query("BEGIN");
+
+      const accountResult = await client.query(
+        `
+        INSERT INTO credit_accounts (
+          id, service_id, buyer_wallet, currency, available_amount, reserved_amount
+        ) VALUES (
+          $1, $2, $3, $4, '0', '0'
+        )
+        ON CONFLICT (service_id, buyer_wallet, currency) DO UPDATE
+        SET updated_at = NOW()
+        RETURNING *
+        `,
+        [randomUUID(), input.serviceId, input.buyerWallet, input.payoutSplit.currency]
+      );
+
+      let account = mapCreditAccountRow(accountResult.rows[0]);
+
+      const entryResult = await client.query(
+        `
+        INSERT INTO credit_ledger_entries (
+          id, account_id, service_id, buyer_wallet, currency, kind, amount, reservation_id, payment_id, metadata
+        ) VALUES (
+          $1, $2, $3, $4, $5, 'topup', $6, NULL, $7, $8::jsonb
+        )
+        ON CONFLICT DO NOTHING
+        RETURNING *
+        `,
+        [
+          randomUUID(),
+          account.id,
+          input.serviceId,
+          input.buyerWallet,
+          input.payoutSplit.currency,
+          input.quotedPrice,
+          input.paymentId,
+          JSON.stringify(input.metadata ?? {})
+        ]
+      );
+
+      let entry: CreditLedgerEntryRecord;
+      if (entryResult.rowCount) {
+        const updatedAccountResult = await client.query(
+          `
+          UPDATE credit_accounts
+          SET
+            available_amount = (available_amount::numeric + $2::numeric)::text,
+            updated_at = NOW()
+          WHERE id = $1
+          RETURNING *
+          `,
+          [account.id, input.quotedPrice]
+        );
+        account = mapCreditAccountRow(updatedAccountResult.rows[0]);
+        entry = mapCreditLedgerEntryRow(entryResult.rows[0]);
+      } else {
+        const existingEntryResult = await client.query(
+          `
+          SELECT *
+          FROM credit_ledger_entries
+          WHERE service_id = $1
+            AND payment_id = $2
+            AND kind = 'topup'
+          LIMIT 1
+          `,
+          [input.serviceId, input.paymentId]
+        );
+        if (!existingEntryResult.rowCount) {
+          throw new Error(`Credit top-up entry not found after conflict: ${input.serviceId}:${input.paymentId}`);
+        }
+
+        entry = mapCreditLedgerEntryRow(existingEntryResult.rows[0]);
+        const existingAccountResult = await client.query("SELECT * FROM credit_accounts WHERE id = $1", [entry.accountId]);
+        if (!existingAccountResult.rowCount) {
+          throw new Error(`Credit account not found: ${entry.accountId}`);
+        }
+        account = mapCreditAccountRow(existingAccountResult.rows[0]);
+      }
+
+      if (BigInt(input.payoutSplit.providerAmount) > 0n && input.payoutSplit.providerWallet) {
+        await client.query(
+          `
+          INSERT INTO provider_payouts (
+            id, source_kind, source_id, provider_account_id, provider_wallet, currency, amount, status
+          ) VALUES (
+            $1, 'credit_topup', $2, $3, $4, $5, $6, 'pending'
+          )
+          ON CONFLICT (source_kind, source_id) DO UPDATE
+          SET updated_at = provider_payouts.updated_at
+          `,
+          [
+            randomUUID(),
+            input.paymentId,
+            input.payoutSplit.providerAccountId,
+            input.payoutSplit.providerWallet,
+            input.payoutSplit.currency,
+            input.payoutSplit.providerAmount
+          ]
+        );
+      }
+
+      const responseBody = buildStoredTopupResponseBody({
+        routeId: input.routeId,
+        serviceId: input.serviceId,
+        buyerWallet: input.buyerWallet,
+        quotedPrice: input.quotedPrice,
+        account,
+        entry
+      });
+
+      const idempotencyResult = await client.query(
+        `
+        INSERT INTO idempotency_records (
+          payment_id, normalized_request_hash, buyer_wallet, route_id, route_version,
+          quoted_price, payout_split, payment_payload, facilitator_response, response_kind,
+          response_status_code, response_body, response_headers, provider_payout_source_kind,
+          execution_status, request_id, job_token
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9::jsonb, 'sync',
+          200, $10::jsonb, $11::jsonb, 'credit_topup', 'completed', $12, NULL
+        )
+        ON CONFLICT (payment_id) DO UPDATE
+        SET
+          normalized_request_hash = EXCLUDED.normalized_request_hash,
+          buyer_wallet = EXCLUDED.buyer_wallet,
+          route_id = EXCLUDED.route_id,
+          route_version = EXCLUDED.route_version,
+          quoted_price = EXCLUDED.quoted_price,
+          payout_split = EXCLUDED.payout_split,
+          payment_payload = EXCLUDED.payment_payload,
+          facilitator_response = EXCLUDED.facilitator_response,
+          response_kind = 'sync',
+          response_status_code = 200,
+          response_body = EXCLUDED.response_body,
+          response_headers = EXCLUDED.response_headers,
+          provider_payout_source_kind = 'credit_topup',
+          execution_status = 'completed',
+          request_id = COALESCE(idempotency_records.request_id, EXCLUDED.request_id),
+          updated_at = NOW()
+        RETURNING *
+        `,
+        [
+          input.paymentId,
+          input.normalizedRequestHash,
+          input.buyerWallet,
+          input.routeId,
+          input.routeVersion,
+          input.quotedPrice,
+          JSON.stringify(input.payoutSplit),
+          input.paymentPayload,
+          JSON.stringify(input.facilitatorResponse),
+          JSON.stringify(responseBody),
+          JSON.stringify(input.responseHeaders ?? {}),
+          input.requestId ?? null
+        ]
+      );
+
+      await client.query("COMMIT");
+      return {
+        idempotency: mapIdempotencyRow(idempotencyResult.rows[0]),
+        account,
+        entry
+      };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
   async createCreditTopup(input: {
@@ -3489,6 +4051,51 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     } finally {
       client.release();
     }
+  }
+
+  async getCreditTopupByPaymentId(
+    serviceId: string,
+    paymentId: string
+  ): Promise<{ account: CreditAccountRecord; entry: CreditLedgerEntryRecord } | null> {
+    const result = await this.pool.query(
+      `
+      SELECT
+        account.id AS account_id,
+        account.service_id AS account_service_id,
+        account.buyer_wallet AS account_buyer_wallet,
+        account.currency AS account_currency,
+        account.available_amount AS account_available_amount,
+        account.reserved_amount AS account_reserved_amount,
+        account.created_at AS account_created_at,
+        account.updated_at AS account_updated_at,
+        entry.*
+      FROM credit_ledger_entries entry
+      JOIN credit_accounts account ON account.id = entry.account_id
+      WHERE entry.service_id = $1
+        AND entry.payment_id = $2
+        AND entry.kind = 'topup'
+      LIMIT 1
+      `,
+      [serviceId, paymentId]
+    );
+    if (!result.rowCount) {
+      return null;
+    }
+
+    const row = result.rows[0];
+    return {
+      account: mapCreditAccountRow({
+        id: row.account_id,
+        service_id: row.account_service_id,
+        buyer_wallet: row.account_buyer_wallet,
+        currency: row.account_currency,
+        available_amount: row.account_available_amount,
+        reserved_amount: row.account_reserved_amount,
+        created_at: row.account_created_at,
+        updated_at: row.account_updated_at
+      }),
+      entry: mapCreditLedgerEntryRow(row)
+    };
   }
 
   async getCreditAccount(serviceId: string, buyerWallet: string, currency: "fastUSDC" | "testUSDC"): Promise<CreditAccountRecord | null> {
@@ -5240,6 +5847,8 @@ function mapIdempotencyRow(row: Record<string, unknown>): IdempotencyRecord {
     responseBody: row.response_body,
     responseHeaders: (row.response_headers as Record<string, string>) ?? {},
     providerPayoutSourceKind: (row.provider_payout_source_kind as IdempotencyRecord["providerPayoutSourceKind"]) ?? null,
+    executionStatus: (row.execution_status as IdempotencyRecord["executionStatus"]) ?? "completed",
+    requestId: (row.request_id as string | null) ?? null,
     jobToken: (row.job_token as string | null) ?? undefined,
     createdAt: new Date(row.created_at as string | Date).toISOString(),
     updatedAt: new Date(row.updated_at as string | Date).toISOString()

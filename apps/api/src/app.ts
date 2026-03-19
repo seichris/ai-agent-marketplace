@@ -44,6 +44,8 @@ import {
   verifySessionToken,
   verifyWalletChallenge,
   CREDIT_RESERVATION_TTL_MS,
+  MARKETPLACE_IDENTITY_PAYMENT_HEADER,
+  MARKETPLACE_IDENTITY_REQUEST_HEADER,
   PAYMENT_IDENTIFIER_HEADER,
   PAYMENT_REQUIRED_HEADER,
   PAYMENT_RESPONSE_HEADER,
@@ -81,6 +83,8 @@ export interface MarketplaceApiOptions {
   secretsKey?: string;
   tavilyApiKey?: string;
 }
+
+const PAYMENT_EXECUTION_RECOVERY_MS = 15_000;
 
 const suggestionCreateSchema = z
   .object({
@@ -1418,51 +1422,92 @@ async function handleX402Route(input: {
   }
 
   const requestHash = hashNormalizedRequest(input.route, requestBody);
-  const existing = await input.store.getIdempotencyByPaymentId(paymentHeaders.paymentId);
-  if (existing) {
-    return replayExistingResponse(existing, requestHash, buyerWallet, input.route.version, input.store, input.res);
-  }
-
   const payoutSplit = buildPayoutSplit({
     route: input.route,
     marketplaceWallet: input.payTo,
     quotedPrice
   });
+  const paymentResponseHeaders = buildPaymentResponseHeaders({
+    success: true,
+    network: input.route.network,
+    payer: buyerWallet
+  });
+  const claimedExecution = await input.store.claimPaymentExecution({
+    paymentId: paymentHeaders.paymentId,
+    normalizedRequestHash: requestHash,
+    buyerWallet,
+    routeId: input.route.routeId,
+    routeVersion: input.route.version,
+    quotedPrice,
+    payoutSplit,
+    paymentPayload: paymentHeaders.paymentPayload,
+    facilitatorResponse: verifyResult,
+    responseKind: input.route.mode === "async" ? "job" : "sync",
+    requestId: randomUUID(),
+    jobToken: input.route.mode === "async" ? createOpaqueToken("job") : undefined,
+    responseBody: {
+      status: "processing"
+    },
+    responseHeaders: paymentResponseHeaders
+  });
+  let existing = claimedExecution.record;
+
+  if (
+    existing.normalizedRequestHash !== requestHash ||
+    existing.buyerWallet !== buyerWallet ||
+    existing.routeVersion !== input.route.version
+  ) {
+    return input.res.status(409).json({
+      error: "PAYMENT-IDENTIFIER has already been used for a different request."
+    });
+  }
+
+  if (existing.executionStatus === "completed") {
+    return replayExistingResponse(existing, requestHash, buyerWallet, input.route.version, input.store, input.res);
+  }
+
+  const refund = await input.store.getRefundByPaymentId(paymentHeaders.paymentId);
+  if (refund) {
+    return input.res.status(409).json({
+      error: "This paid request has already failed and refund handling has started.",
+      refund: refund.status === "sent"
+        ? {
+            status: refund.status,
+            txHash: refund.txHash
+          }
+        : {
+            status: refund.status,
+            error: refund.errorMessage
+          }
+    });
+  }
+
+  if (!claimedExecution.created) {
+    if (!isPendingExecutionRecoverable(existing)) {
+      return input.res.status(202).set(existing.responseHeaders).json({
+        status: "processing",
+        retryAfterMs: 5_000
+      });
+    }
+
+    if (!isPendingExecutionRecoverySafe(input.route)) {
+      return input.res.status(409).json({
+        error:
+          "This paid request is pending manual recovery because the upstream outcome was not durably recorded. Do not retry with a new payment identifier."
+      });
+    }
+
+    existing = (await input.store.touchPendingPaymentExecution(paymentHeaders.paymentId)) ?? existing;
+    if (existing.executionStatus === "completed") {
+      return replayExistingResponse(existing, requestHash, buyerWallet, input.route.version, input.store, input.res);
+    }
+  }
+
+  const requestId = existing.requestId ?? randomUUID();
 
   if (isTopupX402Billing(input.route)) {
     try {
-      const topup = await input.store.createCreditTopup({
-        serviceId: input.route.serviceId,
-        buyerWallet,
-        currency: payoutSplit.currency,
-        amount: quotedPrice,
-        paymentId: paymentHeaders.paymentId,
-        metadata: {
-          routeId: input.route.routeId
-        }
-      });
-
-      await persistProviderPayoutSafely(input.store, {
-        payoutSplit,
-        sourceKind: "credit_topup",
-        sourceId: paymentHeaders.paymentId
-      });
-
-      const paymentResponseHeaders = buildPaymentResponseHeaders({
-        success: true,
-        network: input.route.network,
-        payer: buyerWallet
-      });
-      const responseBody = {
-        routeId: input.route.routeId,
-        serviceId: input.route.serviceId,
-        wallet: buyerWallet,
-        topupAmount: rawToDecimalString(quotedPrice, 6),
-        account: serializeCreditAccount(topup.account),
-        entry: serializeCreditEntry(topup.entry)
-      };
-
-      const persisted = await input.store.saveSyncIdempotency({
+      const topup = await input.store.completeCreditTopupCharge({
         paymentId: paymentHeaders.paymentId,
         normalizedRequestHash: requestHash,
         buyerWallet,
@@ -1472,13 +1517,17 @@ async function handleX402Route(input: {
         payoutSplit,
         paymentPayload: paymentHeaders.paymentPayload,
         facilitatorResponse: verifyResult,
-        statusCode: 200,
-        body: responseBody,
-        headers: paymentResponseHeaders,
-        providerPayoutSourceKind: "credit_topup"
+        responseHeaders: paymentResponseHeaders,
+        requestId,
+        serviceId: input.route.serviceId,
+        metadata: {
+          routeId: input.route.routeId
+        }
       });
-
-      return input.res.status(200).set(persisted.responseHeaders).json(responseBody);
+      return input.res
+        .status(200)
+        .set(topup.idempotency.responseHeaders)
+        .json(topup.idempotency.responseBody);
     } catch (error) {
       const failedResponse = await buildRejectedSyncResponse({
         executeResult: {
@@ -1508,24 +1557,62 @@ async function handleX402Route(input: {
         facilitatorResponse: verifyResult,
         statusCode: failedResponse.statusCode,
         body: failedResponse.body,
-        headers: failedResponse.headers
+        headers: failedResponse.headers,
+        requestId
       });
 
       return input.res.status(failedResponse.statusCode).set(failedResponse.headers).json(failedResponse.body);
     }
   }
 
-  const executeResult = await executeRoute({
-    route: input.route,
-    input: requestBody,
-    buyerWallet,
-    requestId: randomUUID(),
-    paymentId: paymentHeaders.paymentId,
-    providers: input.providers,
-    store: input.store,
-    secretsKey: input.secretsKey,
-    tavilyApiKey: input.tavilyApiKey
-  });
+  let executeResult: Awaited<ReturnType<typeof executeRoute>>;
+  try {
+    executeResult = await executeRoute({
+      route: input.route,
+      input: requestBody,
+      buyerWallet,
+      requestId,
+      paymentId: paymentHeaders.paymentId,
+      providers: input.providers,
+      store: input.store,
+      secretsKey: input.secretsKey,
+      tavilyApiKey: input.tavilyApiKey
+    });
+  } catch (error) {
+    const failedResponse = await buildRejectedSyncResponse({
+      executeResult: {
+        kind: "sync",
+        statusCode: 500,
+        body: {
+          error: error instanceof Error ? error.message : "Route execution failed."
+        }
+      },
+      paymentId: paymentHeaders.paymentId,
+      buyerWallet,
+      quotedPrice,
+      route: input.route,
+      store: input.store,
+      refundService: input.refundService
+    });
+
+    await input.store.saveSyncIdempotency({
+      paymentId: paymentHeaders.paymentId,
+      normalizedRequestHash: requestHash,
+      buyerWallet,
+      routeId: input.route.routeId,
+      routeVersion: input.route.version,
+      quotedPrice,
+      payoutSplit,
+      paymentPayload: paymentHeaders.paymentPayload,
+      facilitatorResponse: verifyResult,
+      statusCode: failedResponse.statusCode,
+      body: failedResponse.body,
+      headers: failedResponse.headers,
+      requestId
+    });
+
+    return input.res.status(failedResponse.statusCode).set(failedResponse.headers).json(failedResponse.body);
+  }
 
   if (executeResult.kind === "sync") {
     if (executeResult.statusCode < 200 || executeResult.statusCode >= 400) {
@@ -1551,36 +1638,39 @@ async function handleX402Route(input: {
         facilitatorResponse: verifyResult,
         statusCode: failedResponse.statusCode,
         body: failedResponse.body,
-        headers: failedResponse.headers
+        headers: failedResponse.headers,
+        requestId
       });
 
       return input.res.status(failedResponse.statusCode).set(failedResponse.headers).json(failedResponse.body);
     }
 
-    const paymentResponseHeaders = buildPaymentResponseHeaders({
-      success: true,
-      network: input.route.network,
-      payer: buyerWallet
-    });
-
-    const persisted = await input.store.saveSyncIdempotency({
-      paymentId: paymentHeaders.paymentId,
-      normalizedRequestHash: requestHash,
-      buyerWallet,
-      routeId: input.route.routeId,
-      routeVersion: input.route.version,
-      quotedPrice,
-      payoutSplit,
-      paymentPayload: paymentHeaders.paymentPayload,
-      facilitatorResponse: verifyResult,
-      statusCode: executeResult.statusCode,
-      body: executeResult.body,
-      headers: {
-        ...paymentResponseHeaders,
-        ...(executeResult.headers ?? {})
-      },
-      providerPayoutSourceKind: "route_charge"
-    });
+    let persisted: Awaited<ReturnType<MarketplaceStore["saveSyncIdempotency"]>>;
+    try {
+      persisted = await input.store.saveSyncIdempotency({
+        paymentId: paymentHeaders.paymentId,
+        normalizedRequestHash: requestHash,
+        buyerWallet,
+        routeId: input.route.routeId,
+        routeVersion: input.route.version,
+        quotedPrice,
+        payoutSplit,
+        paymentPayload: paymentHeaders.paymentPayload,
+        facilitatorResponse: verifyResult,
+        statusCode: executeResult.statusCode,
+        body: executeResult.body,
+        headers: {
+          ...paymentResponseHeaders,
+          ...(executeResult.headers ?? {})
+        },
+        requestId,
+        providerPayoutSourceKind: "route_charge"
+      });
+    } catch (error) {
+      return input.res.status(500).json({
+        error: error instanceof Error ? error.message : "Paid sync response persistence failed."
+      });
+    }
 
     await persistProviderPayoutSafely(input.store, {
       payoutSplit,
@@ -1594,43 +1684,48 @@ async function handleX402Route(input: {
       .json(executeResult.body);
   }
 
-  const jobToken = createOpaqueToken("job");
+  const jobToken = existing.jobToken ?? createOpaqueToken("job");
   const acceptedBody = {
     jobToken,
     status: "pending",
     pollAfterMs: executeResult.pollAfterMs ?? 5_000
   };
 
-  const paymentResponseHeaders = buildPaymentResponseHeaders({
-    success: true,
-    network: input.route.network,
-    payer: buyerWallet
-  });
+  try {
+    await input.store.saveAsyncAcceptance({
+      paymentId: paymentHeaders.paymentId,
+      normalizedRequestHash: requestHash,
+      buyerWallet,
+      route: input.route,
+      quotedPrice,
+      payoutSplit,
+      paymentPayload: paymentHeaders.paymentPayload,
+      facilitatorResponse: verifyResult,
+      jobToken: acceptedBody.jobToken,
+      providerJobId: executeResult.providerJobId,
+      requestBody,
+      providerState: executeResult.state,
+      responseBody: acceptedBody,
+      responseHeaders: paymentResponseHeaders,
+      requestId
+    });
+  } catch (error) {
+    return input.res.status(500).json({
+      error: error instanceof Error ? error.message : "Async acceptance persistence failed."
+    });
+  }
 
-  await input.store.saveAsyncAcceptance({
-    paymentId: paymentHeaders.paymentId,
-    normalizedRequestHash: requestHash,
-    buyerWallet,
-    route: input.route,
-    quotedPrice,
-    payoutSplit,
-    paymentPayload: paymentHeaders.paymentPayload,
-    facilitatorResponse: verifyResult,
-    jobToken,
-    providerJobId: executeResult.providerJobId,
-    requestBody,
-    providerState: executeResult.state,
-    responseBody: acceptedBody,
-    responseHeaders: paymentResponseHeaders
-  });
-
-  await input.store.recordProviderAttempt({
-    jobToken,
-    phase: "execute",
-    status: "succeeded",
-    requestPayload: requestBody,
-    responsePayload: executeResult
-  });
+  try {
+    await input.store.recordProviderAttempt({
+      jobToken: acceptedBody.jobToken,
+      phase: "execute",
+      status: "succeeded",
+      requestPayload: requestBody,
+      responsePayload: executeResult
+    });
+  } catch (error) {
+    console.error("Failed to record provider attempt:", error);
+  }
 
   return input.res.status(202).set(paymentResponseHeaders).json(acceptedBody);
 }
@@ -1713,7 +1808,9 @@ async function executeHttpRoute(input: {
   }
 
   const headers: Record<string, string> = {
-    "content-type": "application/json"
+    "content-type": "application/json",
+    [MARKETPLACE_IDENTITY_REQUEST_HEADER]: input.requestId,
+    [MARKETPLACE_IDENTITY_PAYMENT_HEADER]: input.paymentId ?? ""
   };
 
   if (input.route.upstreamAuthMode !== "none") {
@@ -2289,6 +2386,82 @@ function serializeCreditEntry(entry: {
   };
 }
 
+function buildTopupResponseBody(
+  route: PublishedEndpointVersionRecord,
+  buyerWallet: string,
+  quotedPrice: string,
+  account: {
+    id: string;
+    serviceId: string;
+    buyerWallet: string;
+    currency: string;
+    availableAmount: string;
+    reservedAmount: string;
+    createdAt: string;
+    updatedAt: string;
+  },
+  entry: {
+    id: string;
+    accountId: string;
+    serviceId: string;
+    buyerWallet: string;
+    currency: string;
+    kind: string;
+    amount: string;
+    reservationId: string | null;
+    paymentId: string | null;
+    metadata: Record<string, unknown>;
+    createdAt: string;
+  }
+) {
+  return {
+    routeId: route.routeId,
+    serviceId: route.serviceId,
+    wallet: buyerWallet,
+    topupAmount: rawToDecimalString(quotedPrice, 6),
+    account: serializeCreditAccount(account),
+    entry: serializeCreditEntry(entry)
+  };
+}
+
+function isPendingExecutionRecoverable(record: IdempotencyRecord) {
+  const updatedAt = Date.parse(record.updatedAt);
+  if (Number.isNaN(updatedAt)) {
+    return false;
+  }
+
+  return Date.now() - updatedAt >= PAYMENT_EXECUTION_RECOVERY_MS;
+}
+
+function isPendingExecutionRecoverySafe(route: PublishedEndpointVersionRecord) {
+  return route.executorKind === "mock" || route.executorKind === "tavily" || route.executorKind === "marketplace";
+}
+
+function hasStoredTopupResponseBody(body: unknown): body is {
+  routeId: string;
+  serviceId: string;
+  wallet: string;
+  topupAmount: string;
+  account: Record<string, unknown>;
+  entry: Record<string, unknown>;
+} {
+  if (!body || typeof body !== "object") {
+    return false;
+  }
+
+  const candidate = body as Record<string, unknown>;
+  return (
+    typeof candidate.routeId === "string"
+    && typeof candidate.serviceId === "string"
+    && typeof candidate.wallet === "string"
+    && typeof candidate.topupAmount === "string"
+    && typeof candidate.account === "object"
+    && candidate.account !== null
+    && typeof candidate.entry === "object"
+    && candidate.entry !== null
+  );
+}
+
 async function replayExistingResponse(
   record: IdempotencyRecord,
   requestHash: string,
@@ -2305,6 +2478,19 @@ async function replayExistingResponse(
     return res.status(409).json({
       error: "PAYMENT-IDENTIFIER has already been used for a different request."
     });
+  }
+
+  if (record.providerPayoutSourceKind === "credit_topup" && !hasStoredTopupResponseBody(record.responseBody)) {
+    const route = await findPublishedRouteByRouteId(store, record.routeId);
+    if (route && isTopupX402Billing(route)) {
+      const topup = await store.getCreditTopupByPaymentId(route.serviceId, record.paymentId);
+      if (topup) {
+        return res
+          .status(200)
+          .set(record.responseHeaders)
+          .json(buildTopupResponseBody(route, buyerWallet, record.quotedPrice, topup.account, topup.entry));
+      }
+    }
   }
 
   if (record.responseKind === "job" && record.jobToken) {
