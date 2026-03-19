@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 
+import { ThemeProvider } from "@/components/theme-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { resolveWebDeploymentNetwork } from "@/lib/network";
@@ -16,17 +17,25 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   const network = resolveWebDeploymentNetwork(process.env.MARKETPLACE_FAST_NETWORK);
 
   return (
-    <html lang="en">
+    <html lang="en" suppressHydrationWarning>
       <body className="bg-background text-foreground antialiased">
-        <div className="flex min-h-screen flex-col">
-          <SiteHeader
-            apiBaseUrl={apiBaseUrl}
-            deploymentNetwork={network.deploymentNetwork}
-            networkLabel={network.networkLabel}
-          />
-          <div className="flex-1">{children}</div>
-          <SiteFooter />
-        </div>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="light"
+          disableTransitionOnChange
+          enableSystem={false}
+          themes={["light", "dark"]}
+        >
+          <div className="flex min-h-screen flex-col">
+            <SiteHeader
+              apiBaseUrl={apiBaseUrl}
+              deploymentNetwork={network.deploymentNetwork}
+              networkLabel={network.networkLabel}
+            />
+            <div className="flex-1">{children}</div>
+            <SiteFooter />
+          </div>
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -7,21 +7,8 @@ import { ArrowRight, Search } from "lucide-react";
 import type { ServiceSummary } from "@marketplace/shared";
 
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-
-function buildMarketplaceTotals(services: ServiceSummary[]) {
-  return services.reduce(
-    (totals, service) => {
-      totals.calls += service.totalCalls;
-      totals.revenue += Number(service.revenue);
-      totals.endpoints += service.endpointCount;
-      return totals;
-    },
-    { calls: 0, revenue: 0, endpoints: 0 }
-  );
-}
 
 export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
   const [query, setQuery] = useState("");
@@ -46,11 +33,9 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
     });
   }, [category, deferredQuery, services]);
 
-  const totals = buildMarketplaceTotals(services);
-
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-6 py-8 md:px-10 md:py-12">
-      <section className="grid gap-8 lg:grid-cols-[1.25fr_0.95fr]">
+      <section className="space-y-5">
         <div className="space-y-5">
           <Badge variant="outline">Fast-native agent marketplace</Badge>
           <div className="space-y-4">
@@ -62,57 +47,36 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
               endpoints or source integrations providers should ship.
             </p>
           </div>
-          <div className="flex flex-wrap gap-3">
-            <Button onClick={() => window.location.assign("/suggest?type=endpoint")}>Suggest an endpoint</Button>
-            <Button variant="outline" onClick={() => window.location.assign("/skill.md")}>
-              Read SKILL.md
-            </Button>
-          </div>
         </div>
-
-        <Card>
-          <CardHeader>
-            <CardDescription>Marketplace totals</CardDescription>
-            <CardTitle>Catalog snapshot</CardTitle>
-          </CardHeader>
-          <CardContent className="grid gap-4 sm:grid-cols-2">
-            <Metric label="Services" value={String(services.length)} />
-            <Metric label="Endpoints" value={String(totals.endpoints)} />
-            <Metric label="Call volume" value={String(totals.calls)} />
-            <Metric label="Revenue" value={`$${totals.revenue.toFixed(2)}`} />
-          </CardContent>
-        </Card>
       </section>
 
-      <Card>
-        <CardContent className="grid gap-4 p-6 md:grid-cols-[1fr_auto]">
-          <label className="relative block">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search services, owners, or categories"
-              className="pl-9"
-            />
-          </label>
-          <div className="flex flex-wrap gap-2">
-            {categories.map((item) => (
-              <button
-                key={item}
-                type="button"
-                onClick={() => setCategory(item)}
-                className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
-                  item === category
-                    ? "bg-primary text-primary-foreground"
-                    : "bg-background hover:bg-accent hover:text-accent-foreground"
-                }`}
-              >
-                {item}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
+      <div className="grid gap-4 md:grid-cols-[1fr_auto]">
+        <label className="relative block">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search services, owners, or categories"
+            className="pl-9"
+          />
+        </label>
+        <div className="flex flex-wrap gap-2">
+          {categories.map((item) => (
+            <button
+              key={item}
+              type="button"
+              onClick={() => setCategory(item)}
+              className={`rounded-md border px-3 py-2 text-sm font-medium transition-colors ${
+                item === category
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-background hover:bg-accent hover:text-accent-foreground"
+              }`}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
 
       <section className="grid gap-5 lg:grid-cols-2">
         {filtered.map((service) => (
