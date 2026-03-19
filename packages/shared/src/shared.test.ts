@@ -254,6 +254,9 @@ describe("shared marketplace helpers", () => {
     const provider = await store.upsertProviderAccount("fast1providerwallet000000000000000000000000000000000000000000000000", {
       displayName: "Signal Labs"
     });
+    await store.upsertProviderAccount("fast1otherproviderwallet00000000000000000000000000000000000000000000", {
+      displayName: "Other Provider"
+    });
     const claimed = await store.claimProviderRequest(
       created.id,
       "fast1providerwallet000000000000000000000000000000000000000000000000"
@@ -261,13 +264,25 @@ describe("shared marketplace helpers", () => {
     const updated = await store.updateSuggestion(created.id, {
       internalNotes: "Assign to provider after mock launch."
     });
+    const reopened = await store.updateSuggestion(created.id, {
+      status: "submitted"
+    });
+    const reassigned = await store.claimProviderRequest(
+      created.id,
+      "fast1otherproviderwallet00000000000000000000000000000000000000000000"
+    );
+    await store.updateSuggestion(created.id, {
+      status: "shipped"
+    });
 
     expect(claimed?.status).toBe("reviewing");
     expect(claimed?.claimedByProviderAccountId).toBe(provider.id);
     expect(claimed?.claimedByProviderName).toBe("Signal Labs");
     expect(updated?.status).toBe("reviewing");
+    expect(reopened?.claimedByProviderAccountId).toBeNull();
+    expect(reassigned?.claimedByProviderName).toBe("Other Provider");
     expect((await store.listSuggestions()).length).toBe(1);
-    expect((await store.listProviderRequests("fast1providerwallet000000000000000000000000000000000000000000000000")).length).toBe(1);
+    expect((await store.listProviderRequests("fast1providerwallet000000000000000000000000000000000000000000000000")).length).toBe(0);
   });
 
   it("deduplicates refunds by payment id in the in-memory store", async () => {

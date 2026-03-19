@@ -92,13 +92,11 @@ describe("ProviderDashboard", () => {
         title: "Add a structured watchlist endpoint",
         description: "Expose a watchlist-friendly endpoint that returns a ranked signal feed.",
         sourceUrl: null,
-        requesterName: null,
-        requesterEmail: "builder@example.com",
         status: "submitted",
-        internalNotes: null,
-        claimedByProviderAccountId: null,
         claimedByProviderName: null,
         claimedAt: null,
+        claimedByCurrentProvider: false,
+        claimable: true,
         createdAt: "2026-03-19T00:00:00.000Z",
         updatedAt: "2026-03-19T00:00:00.000Z"
       }
@@ -110,13 +108,11 @@ describe("ProviderDashboard", () => {
       title: "Add a structured watchlist endpoint",
       description: "Expose a watchlist-friendly endpoint that returns a ranked signal feed.",
       sourceUrl: null,
-      requesterName: null,
-      requesterEmail: "builder@example.com",
       status: "reviewing",
-      internalNotes: null,
-      claimedByProviderAccountId: "account_1",
       claimedByProviderName: "Signal Labs",
       claimedAt: "2026-03-19T00:05:00.000Z",
+      claimedByCurrentProvider: true,
+      claimable: false,
       createdAt: "2026-03-19T00:00:00.000Z",
       updatedAt: "2026-03-19T00:05:00.000Z"
     });
@@ -134,6 +130,7 @@ describe("ProviderDashboard", () => {
 
     expect(screen.getByText("Open requests")).toBeTruthy();
     expect(screen.getByText("Add a structured watchlist endpoint")).toBeTruthy();
+    expect(screen.queryByText("builder@example.com")).toBeNull();
 
     fireEvent.click(screen.getByRole("button", { name: "Claim request" }));
 

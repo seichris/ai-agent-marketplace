@@ -1,6 +1,7 @@
 import type {
   CreateProviderEndpointDraftInput,
   CreateProviderServiceInput,
+  ProviderRequestRecord,
   ProviderAccountRecord,
   ProviderEndpointDraftRecord,
   ProviderServiceDetailRecord,
@@ -169,8 +170,8 @@ export async function fetchProviderAccount(
 export async function fetchProviderRequests(
   apiBaseUrl: string,
   accessToken: string
-): Promise<SuggestionRecord[]> {
-  const data = await fetchMarketplace<{ requests: SuggestionRecord[] }>({
+): Promise<ProviderRequestRecord[]> {
+  const data = await fetchMarketplace<{ requests: ProviderRequestRecord[] }>({
     apiBaseUrl,
     accessToken,
     path: "/provider/requests"
@@ -183,8 +184,8 @@ export async function claimProviderRequest(
   apiBaseUrl: string,
   accessToken: string,
   requestId: string
-): Promise<SuggestionRecord> {
-  return fetchMarketplace<SuggestionRecord>({
+): Promise<ProviderRequestRecord> {
+  return fetchMarketplace<ProviderRequestRecord>({
     apiBaseUrl,
     accessToken,
     path: `/provider/requests/${requestId}/claim`,

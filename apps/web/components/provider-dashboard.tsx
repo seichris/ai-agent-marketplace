@@ -4,8 +4,8 @@ import React from "react";
 import type {
   MarketplaceDeploymentNetwork,
   ProviderAccountRecord,
+  ProviderRequestRecord,
   ProviderServiceDetailRecord,
-  SuggestionRecord
 } from "@marketplace/shared";
 
 import { ProviderSessionGate } from "@/components/provider-session-gate";
@@ -51,7 +51,7 @@ function ProviderDashboardInner({
 }) {
   const [account, setAccount] = React.useState<ProviderAccountRecord | null | undefined>(undefined);
   const [services, setServices] = React.useState<ProviderServiceDetailRecord[]>([]);
-  const [requests, setRequests] = React.useState<SuggestionRecord[]>([]);
+  const [requests, setRequests] = React.useState<ProviderRequestRecord[]>([]);
   const [pending, startTransition] = React.useTransition();
   const [error, setError] = React.useState<string | null>(null);
 
@@ -100,8 +100,7 @@ function ProviderDashboardInner({
           sortRequests(
             current
               .filter((request) => request.id !== updated.id)
-              .concat(updated),
-            account.id
+              .concat(updated)
           )
         );
       } catch (nextError) {
@@ -146,10 +145,8 @@ function ProviderDashboardInner({
   const serviceCount = services.length;
   const publishedServiceCount = services.filter((service) => service.service.status === "published").length;
   const endpointDraftCount = services.reduce((sum, service) => sum + service.endpoints.length, 0);
-  const claimedRequestCount = requests.filter((request) => request.claimedByProviderAccountId === account.id).length;
-  const openRequestCount = requests.filter(
-    (request) => !request.claimedByProviderAccountId && request.status !== "shipped"
-  ).length;
+  const claimedRequestCount = requests.filter((request) => request.claimedByCurrentProvider).length;
+  const openRequestCount = requests.filter((request) => request.claimable).length;
 
   return (
     <div className="grid gap-6">
@@ -195,10 +192,9 @@ function ProviderDashboardInner({
             ) : null}
 
             {requests.map((request) => {
-              const claimedByCurrentProvider = request.claimedByProviderAccountId === account.id;
-              const claimedByOtherProvider =
-                Boolean(request.claimedByProviderAccountId) && request.claimedByProviderAccountId !== account.id;
-              const isClaimable = !request.claimedByProviderAccountId && request.status !== "shipped";
+              const claimedByCurrentProvider = request.claimedByCurrentProvider;
+              const claimedByOtherProvider = Boolean(request.claimedByProviderName) && !request.claimedByCurrentProvider;
+              const isClaimable = request.claimable;
 
               return (
                 <div key={request.id} className="rounded-card border border-border bg-background/70 p-5 dark:bg-background/20">
@@ -224,7 +220,6 @@ function ProviderDashboardInner({
 
                   <div className="mt-4 grid gap-2 text-sm text-muted-foreground">
                     {request.sourceUrl ? <div>Source URL: {request.sourceUrl}</div> : null}
-                    {request.requesterEmail ? <div>Requester: {request.requesterEmail}</div> : null}
                     {request.claimedAt && claimedByCurrentProvider ? <div>Claimed: {request.claimedAt.slice(0, 10)}</div> : null}
                   </div>
 
@@ -296,11 +291,10 @@ function MetricCard({ label, value }: { label: string; value: string }) {
   );
 }
 
-function sortRequests(requests: SuggestionRecord[], providerAccountId: string): SuggestionRecord[] {
+function sortRequests(requests: ProviderRequestRecord[]): ProviderRequestRecord[] {
   return [...requests].sort((left, right) => {
-    const leftRank = left.claimedByProviderAccountId === providerAccountId ? 0 : left.claimedByProviderAccountId ? 2 : 1;
-    const rightRank =
-      right.claimedByProviderAccountId === providerAccountId ? 0 : right.claimedByProviderAccountId ? 2 : 1;
+    const leftRank = left.claimedByCurrentProvider ? 0 : left.claimable ? 1 : 2;
+    const rightRank = right.claimedByCurrentProvider ? 0 : right.claimable ? 1 : 2;
 
     if (leftRank !== rightRank) {
       return leftRank - rightRank;

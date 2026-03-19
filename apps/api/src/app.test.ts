@@ -155,7 +155,8 @@ describe("marketplace api", () => {
         type: "endpoint",
         serviceSlug: "mock-research-signals",
         title: "Add a structured watchlist endpoint",
-        description: "Expose a watchlist-friendly endpoint that returns a ranked signal feed."
+        description: "Expose a watchlist-friendly endpoint that returns a ranked signal feed.",
+        requesterEmail: "builder@example.com"
       });
 
     expect(created.status).toBe(201);
@@ -180,7 +181,10 @@ describe("marketplace api", () => {
 
     expect(listed.status).toBe(200);
     expect(listed.body.requests).toHaveLength(1);
-    expect(listed.body.requests[0].claimedByProviderAccountId).toBeNull();
+    expect(listed.body.requests[0].claimedByCurrentProvider).toBe(false);
+    expect(listed.body.requests[0].claimable).toBe(true);
+    expect(listed.body.requests[0].requesterEmail).toBeUndefined();
+    expect(listed.body.requests[0].internalNotes).toBeUndefined();
 
     const claimed = await request(app)
       .post(`/provider/requests/${created.body.id}/claim`)
@@ -189,13 +193,41 @@ describe("marketplace api", () => {
     expect(claimed.status).toBe(200);
     expect(claimed.body.status).toBe("reviewing");
     expect(claimed.body.claimedByProviderName).toBe("Signal Labs");
+    expect(claimed.body.claimedByCurrentProvider).toBe(true);
+    expect(claimed.body.requesterEmail).toBeUndefined();
 
-    const conflict = await request(app)
+    const reopened = await request(app)
+      .patch(`/internal/suggestions/${created.body.id}`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        status: "submitted",
+        internalNotes: "Reopen for reassignment."
+      });
+
+    expect(reopened.status).toBe(200);
+    expect(reopened.body.claimedByProviderAccountId).toBeNull();
+
+    const reassigned = await request(app)
       .post(`/provider/requests/${created.body.id}/claim`)
       .set("Authorization", `Bearer ${otherToken}`);
 
-    expect(conflict.status).toBe(409);
-    expect(conflict.body.error).toContain("already claimed");
+    expect(reassigned.status).toBe(200);
+    expect(reassigned.body.claimedByProviderName).toBe("Other Provider");
+    expect(reassigned.body.claimedByCurrentProvider).toBe(true);
+
+    await request(app)
+      .patch(`/internal/suggestions/${created.body.id}`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        status: "shipped"
+      });
+
+    const afterShip = await request(app)
+      .get("/provider/requests")
+      .set("Authorization", `Bearer ${providerToken}`);
+
+    expect(afterShip.status).toBe(200);
+    expect(afterShip.body.requests).toHaveLength(0);
   });
 
   it("returns 402 and payment requirements for unpaid routes", async () => {

@@ -43,11 +43,13 @@ import {
   type JobRecord,
   type MarketplaceRoute,
   type MarketplaceStore,
+  type ProviderRequestRecord,
   type ProviderServiceDetailRecord,
   type ProviderRegistry,
   type PublishedEndpointVersionRecord,
   type PublishedServiceVersionRecord,
   type RefundService,
+  type SuggestionRecord,
   type UpdateProviderEndpointDraftInput,
   type UpstreamAuthMode
 } from "@marketplace/shared";
@@ -519,8 +521,15 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
       return;
     }
 
+    const account = await options.store.getProviderAccountByWallet(session.wallet);
+    if (!account) {
+      return res.json({ requests: [] satisfies ProviderRequestRecord[] });
+    }
+
     const requests = await options.store.listProviderRequests(session.wallet);
-    return res.json({ requests });
+    return res.json({
+      requests: requests.map((request) => buildProviderRequestResponse(request, account.id))
+    });
   });
 
   app.post("/provider/requests/:id/claim", async (req, res) => {
@@ -530,12 +539,17 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
     }
 
     try {
+      const account = await options.store.getProviderAccountByWallet(session.wallet);
+      if (!account) {
+        return res.status(404).json({ error: "Provider account not found." });
+      }
+
       const claimed = await options.store.claimProviderRequest(req.params.id, session.wallet);
       if (!claimed) {
         return res.status(404).json({ error: "Request not found." });
       }
 
-      return res.json(claimed);
+      return res.json(buildProviderRequestResponse(claimed, account.id));
     } catch (error) {
       return handleProviderMutationError(res, error);
     }
@@ -1595,6 +1609,28 @@ function buildJobResponse(job: JobRecord, refund: Awaited<ReturnType<Marketplace
         }
       : undefined,
     updatedAt: job.updatedAt
+  };
+}
+
+function buildProviderRequestResponse(
+  request: SuggestionRecord,
+  currentProviderAccountId: string
+): ProviderRequestRecord {
+  return {
+    id: request.id,
+    type: request.type,
+    serviceSlug: request.serviceSlug,
+    title: request.title,
+    description: request.description,
+    sourceUrl: request.sourceUrl,
+    status: request.status,
+    claimedByProviderName: request.claimedByProviderName,
+    claimedAt: request.claimedAt,
+    claimedByCurrentProvider: request.claimedByProviderAccountId === currentProviderAccountId,
+    claimable:
+      !request.claimedByProviderAccountId && request.status !== "rejected" && request.status !== "shipped",
+    createdAt: request.createdAt,
+    updatedAt: request.updatedAt
   };
 }
 

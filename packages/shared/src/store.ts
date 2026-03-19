@@ -82,7 +82,7 @@ function mapPublishedServiceToDefinition(service: PublishedServiceVersionRecord)
 }
 
 function isSuggestionProviderVisible(status: SuggestionStatus): boolean {
-  return status !== "rejected";
+  return status !== "rejected" && status !== "shipped";
 }
 
 function buildProviderServiceDetail(input: {
@@ -1228,10 +1228,16 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       return null;
     }
 
+    const nextStatus = input.status ?? existing.status;
+    const shouldClearClaim = nextStatus === "submitted";
+
     const updated: SuggestionRecord = {
       ...existing,
-      status: input.status ?? existing.status,
+      status: nextStatus,
       internalNotes: input.internalNotes === undefined ? existing.internalNotes : input.internalNotes,
+      claimedByProviderAccountId: shouldClearClaim ? null : existing.claimedByProviderAccountId,
+      claimedByProviderName: shouldClearClaim ? null : existing.claimedByProviderName,
+      claimedAt: shouldClearClaim ? null : existing.claimedAt,
       updatedAt: timestamp()
     };
 
@@ -3212,6 +3218,18 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           WHEN $3::boolean THEN $4
           ELSE internal_notes
         END,
+        claimed_provider_account_id = CASE
+          WHEN COALESCE($2, status) = 'submitted' THEN NULL
+          ELSE claimed_provider_account_id
+        END,
+        claimed_provider_name = CASE
+          WHEN COALESCE($2, status) = 'submitted' THEN NULL
+          ELSE claimed_provider_name
+        END,
+        claimed_at = CASE
+          WHEN COALESCE($2, status) = 'submitted' THEN NULL
+          ELSE claimed_at
+        END,
         updated_at = NOW()
       WHERE id = $1
       RETURNING *
@@ -3238,6 +3256,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       SELECT *
       FROM service_suggestions
       WHERE status <> 'rejected'
+        AND status <> 'shipped'
       ORDER BY
         CASE
           WHEN claimed_provider_account_id = $1 THEN 0

@@ -168,6 +168,22 @@ export interface SuggestionRecord {
   updatedAt: string;
 }
 
+export interface ProviderRequestRecord {
+  id: string;
+  type: SuggestionType;
+  serviceSlug: string | null;
+  title: string;
+  description: string;
+  sourceUrl: string | null;
+  status: SuggestionStatus;
+  claimedByProviderName: string | null;
+  claimedAt: string | null;
+  claimedByCurrentProvider: boolean;
+  claimable: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface CreateSuggestionInput {
   type: SuggestionType;
   serviceSlug?: string | null;
