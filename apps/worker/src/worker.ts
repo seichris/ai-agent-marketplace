@@ -1,8 +1,7 @@
 import {
   createDefaultProviderRegistry,
-  createFastRefundService,
   type MarketplaceStore,
-  type MarketplaceDeploymentNetwork,
+  type PayoutService,
   type ProviderRegistry,
   type RefundService
 } from "@marketplace/shared";
@@ -10,6 +9,7 @@ import {
 export interface MarketplaceWorkerOptions {
   store: MarketplaceStore;
   refundService: RefundService;
+  payoutService?: PayoutService;
   providers?: ProviderRegistry;
   limit?: number;
 }
@@ -51,7 +51,8 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
     }
 
     if (pollResult.status === "completed") {
-      await options.store.completeJob(job.jobToken, pollResult.body);
+      const completedJob = await options.store.completeJob(job.jobToken, pollResult.body);
+      await persistCompletedJobPayout(options.store, completedJob);
       continue;
     }
 
@@ -99,6 +100,65 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
         errorMessage: message
       });
       await options.store.markRefundFailed(refund.id, message);
+    }
+  }
+
+  if (options.payoutService) {
+    await settleProviderPayouts({
+      store: options.store,
+      payoutService: options.payoutService,
+      limit: options.limit ?? 10
+    });
+  }
+}
+
+async function persistCompletedJobPayout(
+  store: MarketplaceStore,
+  job: Awaited<ReturnType<MarketplaceStore["completeJob"]>>
+) {
+  if (BigInt(job.payoutSplit.providerAmount) <= 0n || !job.payoutSplit.providerWallet) {
+    return;
+  }
+
+  await store.createProviderPayout({
+    sourceKind: "route_charge",
+    sourceId: job.jobToken,
+    providerAccountId: job.payoutSplit.providerAccountId,
+    providerWallet: job.payoutSplit.providerWallet,
+    currency: job.payoutSplit.currency,
+    amount: job.payoutSplit.providerAmount
+  });
+}
+
+async function settleProviderPayouts(input: {
+  store: MarketplaceStore;
+  payoutService: PayoutService;
+  limit: number;
+}) {
+  const pending = await input.store.listPendingProviderPayouts(input.limit);
+  const groups = new Map<string, typeof pending>();
+
+  for (const payout of pending) {
+    const key = `${payout.providerWallet}:${payout.currency}`;
+    const current = groups.get(key) ?? [];
+    current.push(payout);
+    groups.set(key, current);
+  }
+
+  for (const payouts of groups.values()) {
+    const payoutIds = payouts.map((payout) => payout.id);
+    const amount = payouts.reduce((total, payout) => total + BigInt(payout.amount), 0n).toString();
+
+    try {
+      const receipt = await input.payoutService.issuePayout({
+        wallet: payouts[0]!.providerWallet,
+        amount,
+        reason: `Marketplace provider payout batch (${payoutIds.length} records).`
+      });
+      await input.store.markProviderPayoutsSent(payoutIds, receipt.txHash);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown payout failure.";
+      await input.store.markProviderPayoutSendFailure(payoutIds, message);
     }
   }
 }

@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import {
+  createApiSession,
   fetchJobResult,
   initializeWallet,
   invokePaidRoute,
@@ -222,5 +223,93 @@ describe("marketplace cli", () => {
       jobToken: "job_123",
       status: "completed"
     });
+  });
+
+  it("creates an API-scoped session and invokes a prepaid-credit route without x402", async () => {
+    const tempDir = await mkdtemp(join(tmpdir(), "marketplace-cli-api-session-"));
+    const keyfilePath = join(tempDir, "wallet.json");
+    const configPath = join(tempDir, "config.json");
+    const initialized = await initializeWallet({ keyfilePath, configPath });
+
+    const fetchImpl = vi.fn(async (input: string | URL | Request, init?: RequestInit) => {
+      const url = typeof input === "string" ? input : input.toString();
+
+      if (url.endsWith("/api/orders/place-order") && !new Headers(init?.headers).get("authorization")) {
+        return jsonResponse(401, { error: "Missing bearer token." });
+      }
+
+      if (url.endsWith("/auth/challenge")) {
+        return jsonResponse(200, {
+          wallet: initialized.address,
+          resourceType: "api",
+          resourceId: "orders.place-order.v1",
+          nonce: "nonce-2",
+          expiresAt: new Date(Date.now() + 60_000).toISOString(),
+          message: [
+            "Fast Marketplace Access",
+            `Wallet: ${initialized.address}`,
+            "Resource: api/orders.place-order.v1",
+            "Nonce: nonce-2",
+            `Expires: ${new Date(Date.now() + 60_000).toISOString()}`
+          ].join("\n")
+        });
+      }
+
+      if (url.endsWith("/auth/session")) {
+        return jsonResponse(200, {
+          accessToken: "api-token-1"
+        });
+      }
+
+      if (url.endsWith("/api/orders/place-order")) {
+        expect(new Headers(init?.headers).get("authorization")).toBe("Bearer api-token-1");
+        return jsonResponse(200, {
+          orderId: "ord_123"
+        });
+      }
+
+      throw new Error(`Unexpected URL ${url}`);
+    });
+
+    const session = await createApiSession(
+      {
+        apiUrl: "http://localhost:3000",
+        provider: "orders",
+        operation: "place-order",
+        keyfilePath,
+        configPath
+      },
+      {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        confirm: async () => true,
+        now: () => new Date(),
+        print: () => {},
+        error: () => {}
+      }
+    );
+
+    expect(session.accessToken).toBe("api-token-1");
+
+    const result = await invokePaidRoute(
+      {
+        apiUrl: "http://localhost:3000",
+        provider: "orders",
+        operation: "place-order",
+        body: { item: "notebook" },
+        keyfilePath,
+        configPath
+      },
+      {
+        fetchImpl: fetchImpl as unknown as typeof fetch,
+        confirm: async () => true,
+        now: () => new Date(),
+        print: () => {},
+        error: () => {}
+      }
+    );
+
+    expect(result.statusCode).toBe(200);
+    expect(result.body).toEqual({ orderId: "ord_123" });
+    expect(result.note).toContain("wallet-session");
   });
 });

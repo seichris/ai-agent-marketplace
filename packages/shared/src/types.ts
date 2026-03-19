@@ -2,13 +2,13 @@ import type { MarketplacePaymentNetwork, MarketplaceTokenSymbol } from "./networ
 
 export type JsonSchema = Record<string, unknown>;
 export type RouteMode = "sync" | "async";
-export type ResourceType = "job" | "site";
+export type ResourceType = "job" | "site" | "api";
 export type JobStatus = "pending" | "completed" | "failed";
 export type RefundStatus = "not_required" | "pending" | "sent" | "failed";
 export type SuggestionType = "endpoint" | "source";
 export type SuggestionStatus = "submitted" | "reviewing" | "accepted" | "rejected" | "shipped";
 export type UpstreamAuthMode = "none" | "bearer" | "header";
-export type RouteExecutorKind = "mock" | "http" | "tavily";
+export type RouteExecutorKind = "mock" | "http" | "tavily" | "marketplace";
 export type ProviderServiceStatus =
   | "draft"
   | "pending_review"
@@ -36,6 +36,25 @@ export interface PersistedPayoutSplit {
   providerAmount: string;
 }
 
+export type RouteBillingType = "fixed_x402" | "topup_x402_variable" | "prepaid_credit";
+
+export interface FixedX402Billing {
+  type: "fixed_x402";
+  price: string;
+}
+
+export interface TopupX402VariableBilling {
+  type: "topup_x402_variable";
+  minAmount: string;
+  maxAmount: string;
+}
+
+export interface PrepaidCreditBilling {
+  type: "prepaid_credit";
+}
+
+export type RouteBilling = FixedX402Billing | TopupX402VariableBilling | PrepaidCreditBilling;
+
 export interface MarketplaceRoute {
   routeId: string;
   provider: string;
@@ -44,6 +63,7 @@ export interface MarketplaceRoute {
   mode: RouteMode;
   network: MarketplacePaymentNetwork;
   price: string;
+  billing: RouteBilling;
   title: string;
   description: string;
   payout: RoutePayoutConfig;
@@ -132,6 +152,7 @@ export interface ServiceCatalogEndpoint {
   title: string;
   description: string;
   price: string;
+  billingType: RouteBillingType;
   tokenSymbol: MarketplaceTokenSymbol;
   mode: RouteMode;
   method: "POST";
@@ -248,6 +269,7 @@ export interface ProviderEndpointDraftRecord {
   title: string;
   description: string;
   price: string;
+  billing: RouteBilling;
   mode: RouteMode;
   requestSchemaJson: JsonSchema;
   responseSchemaJson: JsonSchema;
@@ -336,16 +358,19 @@ export interface CreateProviderEndpointDraftInput {
   operation: string;
   title: string;
   description: string;
-  price: string;
+  price?: string;
+  billingType: RouteBillingType;
+  minAmount?: string | null;
+  maxAmount?: string | null;
   mode: "sync";
   requestSchemaJson: JsonSchema;
   responseSchemaJson: JsonSchema;
   requestExample: unknown;
   responseExample: unknown;
   usageNotes?: string | null;
-  upstreamBaseUrl: string;
-  upstreamPath: string;
-  upstreamAuthMode: UpstreamAuthMode;
+  upstreamBaseUrl?: string | null;
+  upstreamPath?: string | null;
+  upstreamAuthMode?: UpstreamAuthMode | null;
   upstreamAuthHeaderName?: string | null;
   upstreamSecret?: string | null;
 }
@@ -355,14 +380,17 @@ export interface UpdateProviderEndpointDraftInput {
   title?: string;
   description?: string;
   price?: string;
+  billingType?: RouteBillingType;
+  minAmount?: string | null;
+  maxAmount?: string | null;
   requestSchemaJson?: JsonSchema;
   responseSchemaJson?: JsonSchema;
   requestExample?: unknown;
   responseExample?: unknown;
   usageNotes?: string | null;
-  upstreamBaseUrl?: string;
-  upstreamPath?: string;
-  upstreamAuthMode?: UpstreamAuthMode;
+  upstreamBaseUrl?: string | null;
+  upstreamPath?: string | null;
+  upstreamAuthMode?: UpstreamAuthMode | null;
   upstreamAuthHeaderName?: string | null;
   upstreamSecret?: string | null;
   clearUpstreamSecret?: boolean;
@@ -408,7 +436,8 @@ export interface ProviderExecuteContext {
   route: MarketplaceRoute;
   input: unknown;
   buyerWallet: string;
-  paymentId: string;
+  requestId: string;
+  paymentId: string | null;
 }
 
 export interface ProviderPollContext {
@@ -440,6 +469,14 @@ export interface RefundReceipt {
 
 export interface RefundService {
   issueRefund(input: { wallet: string; amount: string; reason: string }): Promise<RefundReceipt>;
+}
+
+export interface PayoutReceipt {
+  txHash: string;
+}
+
+export interface PayoutService {
+  issuePayout(input: { wallet: string; amount: string; reason: string }): Promise<PayoutReceipt>;
 }
 
 export interface IdempotencyRecord {
@@ -517,6 +554,81 @@ export interface RefundRecord {
   updatedAt: string;
 }
 
+export interface ProviderPayoutRecord {
+  id: string;
+  sourceKind: "route_charge" | "credit_topup";
+  sourceId: string;
+  providerAccountId: string;
+  providerWallet: string;
+  currency: MarketplaceTokenSymbol;
+  amount: string;
+  status: "pending" | "sent";
+  txHash: string | null;
+  sentAt: string | null;
+  attemptCount: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditAccountRecord {
+  id: string;
+  serviceId: string;
+  buyerWallet: string;
+  currency: MarketplaceTokenSymbol;
+  availableAmount: string;
+  reservedAmount: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CreditLedgerEntryRecord {
+  id: string;
+  accountId: string;
+  serviceId: string;
+  buyerWallet: string;
+  currency: MarketplaceTokenSymbol;
+  kind: "topup" | "reserve" | "capture" | "release";
+  amount: string;
+  reservationId: string | null;
+  paymentId: string | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
+
+export interface CreditReservationRecord {
+  id: string;
+  accountId: string;
+  serviceId: string;
+  buyerWallet: string;
+  currency: MarketplaceTokenSymbol;
+  idempotencyKey: string;
+  providerReference: string | null;
+  status: "reserved" | "captured" | "released" | "expired";
+  reservedAmount: string;
+  capturedAmount: string;
+  expiresAt: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderRuntimeKeyRecord {
+  id: string;
+  serviceId: string;
+  keyPrefix: string;
+  keyHash: string;
+  secretCiphertext: string;
+  iv: string;
+  authTag: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ProviderRuntimeKeyWithSecret {
+  record: ProviderRuntimeKeyRecord;
+  plaintextKey: string;
+}
+
 export interface SaveSyncIdempotencyInput {
   paymentId: string;
   normalizedRequestHash: string;
@@ -584,6 +696,65 @@ export interface MarketplaceStore {
   markRefundSent(refundId: string, txHash: string): Promise<RefundRecord>;
   markRefundFailed(refundId: string, errorMessage: string): Promise<RefundRecord>;
   getRefundByJobToken(jobToken: string): Promise<RefundRecord | null>;
+  createProviderPayout(input: {
+    sourceKind: "route_charge" | "credit_topup";
+    sourceId: string;
+    providerAccountId: string;
+    providerWallet: string;
+    currency: MarketplaceTokenSymbol;
+    amount: string;
+  }): Promise<ProviderPayoutRecord>;
+  listPendingProviderPayouts(limit: number): Promise<ProviderPayoutRecord[]>;
+  markProviderPayoutSendFailure(payoutIds: string[], errorMessage: string): Promise<void>;
+  markProviderPayoutsSent(payoutIds: string[], txHash: string): Promise<ProviderPayoutRecord[]>;
+  createCreditTopup(input: {
+    serviceId: string;
+    buyerWallet: string;
+    currency: MarketplaceTokenSymbol;
+    amount: string;
+    paymentId: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ account: CreditAccountRecord; entry: CreditLedgerEntryRecord }>;
+  getCreditAccount(serviceId: string, buyerWallet: string, currency: MarketplaceTokenSymbol): Promise<CreditAccountRecord | null>;
+  reserveCredit(input: {
+    serviceId: string;
+    buyerWallet: string;
+    currency: MarketplaceTokenSymbol;
+    amount: string;
+    idempotencyKey: string;
+    providerReference?: string | null;
+    expiresAt: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ account: CreditAccountRecord; reservation: CreditReservationRecord; entry: CreditLedgerEntryRecord }>;
+  captureCreditReservation(input: {
+    reservationId: string;
+    amount: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{
+    account: CreditAccountRecord;
+    reservation: CreditReservationRecord;
+    captureEntry: CreditLedgerEntryRecord;
+    releaseEntry: CreditLedgerEntryRecord | null;
+  }>;
+  releaseCreditReservation(input: {
+    reservationId: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ account: CreditAccountRecord; reservation: CreditReservationRecord; entry: CreditLedgerEntryRecord | null }>;
+  expireCreditReservation(reservationId: string): Promise<{
+    account: CreditAccountRecord;
+    reservation: CreditReservationRecord;
+    entry: CreditLedgerEntryRecord | null;
+  }>;
+  getCreditReservationById(reservationId: string): Promise<CreditReservationRecord | null>;
+  rotateProviderRuntimeKey(serviceId: string, wallet: string, secretMaterial: {
+    keyHash: string;
+    keyPrefix: string;
+    ciphertext: string;
+    iv: string;
+    authTag: string;
+  }): Promise<ProviderRuntimeKeyRecord>;
+  getProviderRuntimeKeyForOwner(serviceId: string, wallet: string): Promise<ProviderRuntimeKeyRecord | null>;
+  getProviderRuntimeKeyByPlaintext(plaintextKey: string): Promise<ProviderRuntimeKeyRecord | null>;
   getServiceAnalytics(routeIds: string[]): Promise<ServiceAnalytics>;
   listPublishedServices(): Promise<PublishedServiceVersionRecord[]>;
   getPublishedServiceBySlug(slug: string): Promise<{

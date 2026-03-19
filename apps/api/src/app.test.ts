@@ -3,7 +3,7 @@ import { FastProvider, FastWallet } from "@fastxyz/sdk";
 import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { InMemoryMarketplaceStore } from "@marketplace/shared";
+import { InMemoryMarketplaceStore, verifyMarketplaceIdentityHeaders } from "@marketplace/shared";
 
 import { createMarketplaceApi } from "./app.js";
 
@@ -608,6 +608,7 @@ describe("marketplace api", () => {
         operation: "quote",
         title: "Quote",
         description: "Return a single quote snapshot.",
+        billingType: "fixed_x402",
         price: "$0.25",
         mode: "sync",
         requestSchemaJson: {
@@ -734,6 +735,268 @@ describe("marketplace api", () => {
     expect(record?.payoutSplit.marketplaceAmount).toBe("0");
   });
 
+  it("supports variable topups and prepaid-credit execution with signed provider identity headers", async () => {
+    const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
+    const { app, buyer, store } = await createTestApp();
+    const providerToken = await createSiteSession(app, providerWallet);
+
+    await request(app)
+      .post("/provider/me")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        displayName: "Orders Inc",
+        websiteUrl: "https://orders.example.com"
+      });
+
+    const createdService = await request(app)
+      .post("/provider/services")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        slug: "orders-inc",
+        apiNamespace: "orders",
+        name: "Orders Inc",
+        tagline: "Prepaid purchasing workflows",
+        about: "Provider-authored prepaid purchasing endpoints.",
+        categories: ["Commerce"],
+        promptIntro: 'I want to use the "Orders Inc" service on Fast Marketplace.',
+        setupInstructions: ["Fund a prepaid credit balance first."],
+        websiteUrl: "https://orders.example.com",
+        payoutWallet: providerWallet.address
+      });
+
+    expect(createdService.status).toBe(201);
+    const serviceId = createdService.body.service.id as string;
+
+    const runtimeKeyResponse = await request(app)
+      .post(`/provider/services/${serviceId}/runtime-key`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({});
+
+    expect(runtimeKeyResponse.status).toBe(201);
+    const runtimeKey = runtimeKeyResponse.body.plaintextKey as string;
+
+    const topupEndpoint = await request(app)
+      .post(`/provider/services/${serviceId}/endpoints`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        operation: "topup",
+        title: "Top Up",
+        description: "Add prepaid marketplace credit.",
+        billingType: "topup_x402_variable",
+        minAmount: "10",
+        maxAmount: "100",
+        mode: "sync",
+        requestSchemaJson: {
+          type: "object",
+          properties: {
+            amount: { type: "string" }
+          },
+          required: ["amount"],
+          additionalProperties: false
+        },
+        responseSchemaJson: {
+          type: "object",
+          properties: {
+            topupAmount: { type: "string" }
+          },
+          required: ["topupAmount"],
+          additionalProperties: true
+        },
+        requestExample: {
+          amount: "25"
+        },
+        responseExample: {
+          topupAmount: "25"
+        }
+      });
+
+    expect(topupEndpoint.status).toBe(201);
+
+    const prepaidEndpoint = await request(app)
+      .post(`/provider/services/${serviceId}/endpoints`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        operation: "place-order",
+        title: "Place Order",
+        description: "Place an order against prepaid credit.",
+        billingType: "prepaid_credit",
+        mode: "sync",
+        requestSchemaJson: {
+          type: "object",
+          properties: {
+            item: { type: "string" }
+          },
+          required: ["item"],
+          additionalProperties: false
+        },
+        responseSchemaJson: {
+          type: "object",
+          properties: {
+            orderId: { type: "string" }
+          },
+          required: ["orderId"],
+          additionalProperties: false
+        },
+        requestExample: {
+          item: "notebook"
+        },
+        responseExample: {
+          orderId: "ord_123"
+        },
+        upstreamBaseUrl: "https://orders.example.com",
+        upstreamPath: "/api/place-order",
+        upstreamAuthMode: "none"
+      });
+
+    expect(prepaidEndpoint.status).toBe(201);
+
+    const verificationChallenge = await request(app)
+      .post(`/provider/services/${serviceId}/verification-challenge`)
+      .set("Authorization", `Bearer ${providerToken}`);
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (fetchInput, init) => {
+      const url = String(fetchInput);
+      if (url === verificationChallenge.body.expectedUrl) {
+        return new Response(verificationChallenge.body.token, { status: 200 });
+      }
+
+      if (url === "https://orders.example.com/api/place-order") {
+        const headers = Object.fromEntries(new Headers(init?.headers).entries());
+        const identity = verifyMarketplaceIdentityHeaders({
+          headers,
+          signingSecret: runtimeKey
+        });
+
+        const reserveResponse = await request(app)
+          .post("/provider/runtime/credits/reserve")
+          .set("Authorization", `Bearer ${runtimeKey}`)
+          .send({
+            buyerWallet: identity.buyerWallet,
+            amount: "12.5",
+            idempotencyKey: `reserve_${identity.requestId}`,
+            providerReference: "amazon-order-123"
+          });
+
+        if (reserveResponse.status !== 200) {
+          return new Response(JSON.stringify(reserveResponse.body), {
+            status: reserveResponse.status,
+            headers: {
+              "content-type": "application/json"
+            }
+          });
+        }
+
+        const captureResponse = await request(app)
+          .post(`/provider/runtime/credits/${reserveResponse.body.reservation.id}/capture`)
+          .set("Authorization", `Bearer ${runtimeKey}`)
+          .send({
+            amount: "12.5"
+          });
+
+        if (captureResponse.status !== 200) {
+          return new Response(JSON.stringify(captureResponse.body), {
+            status: captureResponse.status,
+            headers: {
+              "content-type": "application/json"
+            }
+          });
+        }
+
+        return new Response(JSON.stringify({ orderId: "ord_123" }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    const verified = await request(app)
+      .post(`/provider/services/${serviceId}/verify`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(verified.status).toBe(200);
+
+    const submitted = await request(app)
+      .post(`/provider/services/${serviceId}/submit`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(submitted.status).toBe(202);
+
+    const published = await request(app)
+      .post(`/internal/provider-services/${serviceId}/publish`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        reviewerIdentity: "ops@test"
+      });
+    expect(published.status).toBe(200);
+
+    const preflightTopup = await request(app)
+      .post("/api/orders/topup")
+      .send({ amount: "25" });
+    expect(preflightTopup.status).toBe(402);
+    expect(preflightTopup.body.accepts[0].maxAmountRequired).toBe("25");
+
+    const toppedUp = await request(app)
+      .post("/api/orders/topup")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_orders_topup_1")
+      .send({ amount: "25" });
+
+    expect(toppedUp.status).toBe(200);
+    expect(toppedUp.body.topupAmount).toBe("25");
+    expect(toppedUp.body.account.availableAmountDecimal).toBe("25");
+
+    const unauthorizedPrepaid = await request(app)
+      .post("/api/orders/place-order")
+      .send({ item: "notebook" });
+    expect(unauthorizedPrepaid.status).toBe(401);
+
+    const challenge = await request(app)
+      .post("/auth/challenge")
+      .send({
+        wallet: buyer.address,
+        resourceType: "api",
+        resourceId: "orders.place-order.v1"
+      });
+    expect(challenge.status).toBe(200);
+
+    const signed = await buyer.wallet.sign({ message: challenge.body.message });
+    const apiSession = await request(app)
+      .post("/auth/session")
+      .send({
+        wallet: buyer.address,
+        resourceType: "api",
+        resourceId: "orders.place-order.v1",
+        nonce: challenge.body.nonce,
+        expiresAt: challenge.body.expiresAt,
+        signature: signed.signature
+      });
+    expect(apiSession.status).toBe(200);
+
+    const prepaid = await request(app)
+      .post("/api/orders/place-order")
+      .set("Authorization", `Bearer ${apiSession.body.accessToken}`)
+      .send({ item: "notebook" });
+
+    expect(prepaid.status).toBe(200);
+    expect(prepaid.body.orderId).toBe("ord_123");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://orders.example.com/api/place-order",
+      expect.objectContaining({
+        method: "POST"
+      })
+    );
+
+    const creditAccount = await store.getCreditAccount(serviceId, buyer.address, "fastUSDC");
+    expect(creditAccount?.availableAmount).toBe("12500000");
+    expect(creditAccount?.reservedAmount).toBe("0");
+
+    const pendingPayouts = await store.listPendingProviderPayouts(10);
+    expect(pendingPayouts).toHaveLength(1);
+    expect(pendingPayouts[0]?.amount).toBe("25000000");
+  });
+
   it("requires re-verification when the provider changes the service website host", async () => {
     const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
     const { app } = await createTestApp();
@@ -772,6 +1035,7 @@ describe("marketplace api", () => {
         operation: "quote",
         title: "Quote",
         description: "Return a single quote snapshot.",
+        billingType: "fixed_x402",
         price: "$0.25",
         mode: "sync",
         requestSchemaJson: {
@@ -870,6 +1134,7 @@ describe("marketplace api", () => {
         operation: "quote",
         title: "Quote",
         description: "Return a single quote snapshot.",
+        billingType: "fixed_x402",
         price: "$0.25",
         mode: "sync",
         requestSchemaJson: {
@@ -1052,6 +1317,7 @@ describe("marketplace api", () => {
         operation: "quote",
         title: "Quote",
         description: "Return a single quote snapshot.",
+        billingType: "fixed_x402",
         price: "$0.25",
         mode: "sync",
         requestSchemaJson: {
@@ -1086,6 +1352,7 @@ describe("marketplace api", () => {
         operation: "quote",
         title: "Quote duplicate",
         description: "Duplicate operation.",
+        billingType: "fixed_x402",
         price: "$0.25",
         mode: "sync",
         requestSchemaJson: {

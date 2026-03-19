@@ -46,7 +46,7 @@ export interface LoadedWallet {
 
 export interface MarketplaceChallenge {
   wallet: string;
-  resourceType: "job";
+  resourceType: "job" | "api";
   resourceId: string;
   nonce: string;
   expiresAt: string;
@@ -264,6 +264,37 @@ export async function invokePaidRoute(
     body: bodyString
   });
 
+  if (preflight.status === 401 || preflight.status === 403) {
+    const routeId = `${input.provider}.${input.operation}.v1`;
+    const session = await createScopedSession(
+      {
+        apiUrl: input.apiUrl,
+        resourceType: "api",
+        resourceId: routeId,
+        keyfilePath: input.keyfilePath,
+        configPath: input.configPath,
+        network: input.network,
+        rpcUrl: input.rpcUrl
+      },
+      deps
+    );
+
+    const response = await deps.fetchImpl(endpoint, {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: `Bearer ${session.accessToken}`
+      },
+      body: bodyString
+    });
+
+    return {
+      statusCode: response.status,
+      body: await safeJson(response),
+      note: "Request used wallet-session auth."
+    };
+  }
+
   if (preflight.status !== 402) {
     return {
       statusCode: preflight.status,
@@ -328,6 +359,69 @@ export async function fetchJobResult(
   },
   deps: CliDependencies = defaultCliDependencies()
 ) {
+  const session = await createScopedSession(
+    {
+      apiUrl: input.apiUrl,
+      resourceType: "job",
+      resourceId: input.jobToken,
+      keyfilePath: input.keyfilePath,
+      configPath: input.configPath,
+      network: input.network,
+      rpcUrl: input.rpcUrl
+    },
+    deps
+  );
+
+  const jobResponse = await deps.fetchImpl(`${input.apiUrl.replace(/\/$/, "")}/api/jobs/${input.jobToken}`, {
+    headers: {
+      authorization: `Bearer ${session.accessToken}`
+    }
+  });
+
+  return {
+    statusCode: jobResponse.status,
+    body: await safeJson(jobResponse)
+  };
+}
+
+export async function createApiSession(
+  input: {
+    apiUrl: string;
+    provider: string;
+    operation: string;
+    keyfilePath?: string;
+    configPath?: string;
+    network?: MarketplaceDeploymentNetwork;
+    rpcUrl?: string;
+  },
+  deps: CliDependencies = defaultCliDependencies()
+) {
+  return createScopedSession(
+    {
+      apiUrl: input.apiUrl,
+      resourceType: "api",
+      resourceId: `${input.provider}.${input.operation}.v1`,
+      keyfilePath: input.keyfilePath,
+      configPath: input.configPath,
+      network: input.network,
+      rpcUrl: input.rpcUrl
+    },
+    deps
+  );
+}
+
+async function createScopedSession(
+  input: {
+    apiUrl: string;
+    resourceType: "job" | "api";
+    resourceId: string;
+    keyfilePath?: string;
+    configPath?: string;
+    network?: MarketplaceDeploymentNetwork;
+    rpcUrl?: string;
+  },
+  deps: CliDependencies = defaultCliDependencies()
+) {
   const loaded = await loadWallet(input);
   const baseUrl = input.apiUrl.replace(/\/$/, "");
   const challengeResponse = await deps.fetchImpl(`${baseUrl}/auth/challenge`, {
@@ -335,8 +429,8 @@ export async function fetchJobResult(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       wallet: loaded.paymentWallet.address,
-      resourceType: "job",
-      resourceId: input.jobToken
+      resourceType: input.resourceType,
+      resourceId: input.resourceId
     })
   });
 
@@ -352,8 +446,8 @@ export async function fetchJobResult(
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       wallet: loaded.paymentWallet.address,
-      resourceType: "job",
-      resourceId: input.jobToken,
+      resourceType: input.resourceType,
+      resourceId: input.resourceId,
       nonce: challenge.nonce,
       expiresAt: challenge.expiresAt,
       signature: signed.signature
@@ -364,17 +458,7 @@ export async function fetchJobResult(
     throw new Error(`Session request failed with status ${sessionResponse.status}`);
   }
 
-  const session = await sessionResponse.json() as { accessToken: string };
-  const jobResponse = await deps.fetchImpl(`${baseUrl}/api/jobs/${input.jobToken}`, {
-    headers: {
-      authorization: `Bearer ${session.accessToken}`
-    }
-  });
-
-  return {
-    statusCode: jobResponse.status,
-    body: await safeJson(jobResponse)
-  };
+  return await sessionResponse.json() as { accessToken: string; tokenType?: string };
 }
 
 async function enforceSpendControls(input: {
