@@ -48,6 +48,10 @@ function timestamp(): string {
   return new Date().toISOString();
 }
 
+function quoteIdentifier(value: string): string {
+  return `"${value.replace(/"/g, "\"\"")}"`;
+}
+
 function clone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
@@ -1565,7 +1569,164 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ON refunds(payment_id);
     `);
 
+    await this.normalizeLegacyProviderColumnTypes();
     await this.seedDefaults();
+  }
+
+  private async normalizeLegacyProviderColumnTypes() {
+    const textColumns: Array<[string, string]> = [
+      ["provider_accounts", "owner_wallet"],
+      ["provider_accounts", "display_name"],
+      ["provider_accounts", "bio"],
+      ["provider_accounts", "website_url"],
+      ["provider_accounts", "contact_email"],
+      ["provider_services", "slug"],
+      ["provider_services", "api_namespace"],
+      ["provider_services", "name"],
+      ["provider_services", "tagline"],
+      ["provider_services", "about"],
+      ["provider_services", "prompt_intro"],
+      ["provider_services", "website_url"],
+      ["provider_services", "payout_wallet"],
+      ["provider_services", "status"],
+      ["provider_services", "latest_submitted_version_id"],
+      ["provider_services", "latest_published_version_id"],
+      ["provider_services", "latest_review_id"],
+      ["provider_endpoint_drafts", "route_id"],
+      ["provider_endpoint_drafts", "operation"],
+      ["provider_endpoint_drafts", "title"],
+      ["provider_endpoint_drafts", "description"],
+      ["provider_endpoint_drafts", "price"],
+      ["provider_endpoint_drafts", "usage_notes"],
+      ["provider_endpoint_drafts", "executor_kind"],
+      ["provider_endpoint_drafts", "upstream_base_url"],
+      ["provider_endpoint_drafts", "upstream_path"],
+      ["provider_endpoint_drafts", "upstream_auth_mode"],
+      ["provider_endpoint_drafts", "upstream_auth_header_name"],
+      ["provider_endpoint_drafts", "upstream_secret_ref"],
+      ["provider_verifications", "token"],
+      ["provider_verifications", "status"],
+      ["provider_verifications", "verified_host"],
+      ["provider_verifications", "failure_reason"],
+      ["provider_reviews", "status"],
+      ["provider_reviews", "review_notes"],
+      ["provider_reviews", "reviewer_identity"],
+      ["published_service_versions", "slug"],
+      ["published_service_versions", "api_namespace"],
+      ["published_service_versions", "name"],
+      ["published_service_versions", "owner_name"],
+      ["published_service_versions", "tagline"],
+      ["published_service_versions", "about"],
+      ["published_service_versions", "prompt_intro"],
+      ["published_service_versions", "website_url"],
+      ["published_service_versions", "contact_email"],
+      ["published_service_versions", "payout_wallet"],
+      ["published_service_versions", "status"],
+      ["published_service_versions", "submitted_review_id"],
+      ["published_endpoint_versions", "route_id"],
+      ["published_endpoint_versions", "provider"],
+      ["published_endpoint_versions", "operation"],
+      ["published_endpoint_versions", "version"],
+      ["published_endpoint_versions", "mode"],
+      ["published_endpoint_versions", "network"],
+      ["published_endpoint_versions", "price"],
+      ["published_endpoint_versions", "title"],
+      ["published_endpoint_versions", "description"],
+      ["published_endpoint_versions", "usage_notes"],
+      ["published_endpoint_versions", "executor_kind"],
+      ["published_endpoint_versions", "upstream_base_url"],
+      ["published_endpoint_versions", "upstream_path"],
+      ["published_endpoint_versions", "upstream_auth_mode"],
+      ["published_endpoint_versions", "upstream_auth_header_name"],
+      ["published_endpoint_versions", "upstream_secret_ref"],
+      ["provider_secrets", "label"],
+      ["provider_secrets", "secret_ciphertext"],
+      ["provider_secrets", "iv"],
+      ["provider_secrets", "auth_tag"]
+    ];
+    const booleanColumns: Array<[string, string]> = [
+      ["provider_services", "featured"],
+      ["published_service_versions", "featured"]
+    ];
+
+    for (const [table, column] of textColumns) {
+      await this.coerceLegacyJsonColumnToText(table, column);
+    }
+
+    for (const [table, column] of booleanColumns) {
+      await this.coerceLegacyJsonColumnToBoolean(table, column);
+    }
+  }
+
+  private async coerceLegacyJsonColumnToText(table: string, column: string) {
+    const result = await this.pool.query(
+      `
+      SELECT udt_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = $1
+        AND column_name = $2
+      LIMIT 1
+      `,
+      [table, column]
+    );
+
+    if (!result.rowCount) {
+      return;
+    }
+
+    const type = result.rows[0].udt_name as string;
+    if (type !== "json" && type !== "jsonb") {
+      return;
+    }
+
+    const quotedTable = quoteIdentifier(table);
+    const quotedColumn = quoteIdentifier(column);
+
+    await this.pool.query(
+      `
+      ALTER TABLE ${quotedTable}
+      ALTER COLUMN ${quotedColumn} TYPE TEXT
+      USING trim(both '"' from ${quotedColumn}::text)
+      `
+    );
+  }
+
+  private async coerceLegacyJsonColumnToBoolean(table: string, column: string) {
+    const result = await this.pool.query(
+      `
+      SELECT udt_name
+      FROM information_schema.columns
+      WHERE table_schema = current_schema()
+        AND table_name = $1
+        AND column_name = $2
+      LIMIT 1
+      `,
+      [table, column]
+    );
+
+    if (!result.rowCount) {
+      return;
+    }
+
+    const type = result.rows[0].udt_name as string;
+    if (type !== "json" && type !== "jsonb") {
+      return;
+    }
+
+    const quotedTable = quoteIdentifier(table);
+    const quotedColumn = quoteIdentifier(column);
+
+    await this.pool.query(
+      `
+      ALTER TABLE ${quotedTable}
+      ALTER COLUMN ${quotedColumn} TYPE BOOLEAN
+      USING CASE
+        WHEN ${quotedColumn} IS NULL THEN FALSE
+        ELSE COALESCE(lower(trim(both '"' from ${quotedColumn}::text)) = 'true', FALSE)
+      END
+      `
+    );
   }
 
   private async seedDefaults() {
