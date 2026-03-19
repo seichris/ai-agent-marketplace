@@ -46,6 +46,7 @@ import {
   CREDIT_RESERVATION_TTL_MS,
   MARKETPLACE_IDENTITY_PAYMENT_HEADER,
   MARKETPLACE_IDENTITY_REQUEST_HEADER,
+  PAYMENT_EXECUTION_RECOVERY_MS,
   PAYMENT_IDENTIFIER_HEADER,
   PAYMENT_REQUIRED_HEADER,
   PAYMENT_RESPONSE_HEADER,
@@ -83,8 +84,6 @@ export interface MarketplaceApiOptions {
   secretsKey?: string;
   tavilyApiKey?: string;
 }
-
-const PAYMENT_EXECUTION_RECOVERY_MS = 15_000;
 
 const suggestionCreateSchema = z
   .object({
@@ -1493,7 +1492,7 @@ async function handleX402Route(input: {
     if (!isPendingExecutionRecoverySafe(input.route)) {
       return input.res.status(409).json({
         error:
-          "This paid request is pending manual recovery because the upstream outcome was not durably recorded. Do not retry with a new payment identifier."
+          "This paid request is being reconciled automatically because the upstream outcome was not durably recorded. Do not retry with a new payment identifier."
       });
     }
 

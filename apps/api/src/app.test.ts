@@ -10,6 +10,7 @@ import {
 } from "@marketplace/shared";
 
 import { createMarketplaceApi } from "./app.js";
+import { runMarketplaceWorkerCycle } from "../../worker/src/worker.js";
 
 const TEST_PRIVATE_KEY = "22".repeat(32);
 const PROVIDER_PRIVATE_KEY = "33".repeat(32);
@@ -1003,7 +1004,7 @@ describe("marketplace api", () => {
     expect(record?.payoutSplit.marketplaceAmount).toBe("0");
   });
 
-  it("does not re-execute stale pending self-serve HTTP charges", async () => {
+  it("does not re-execute stale pending self-serve HTTP charges and auto-refunds them in the worker", async () => {
     class FlakyProviderStore extends InMemoryMarketplaceStore {
       private remainingCompletedWriteFailures = 1;
 
@@ -1161,7 +1162,7 @@ describe("marketplace api", () => {
       .send({ symbol: "FAST" });
 
     expect(second.status).toBe(409);
-    expect(second.body.error).toContain("manual recovery");
+    expect(second.body.error).toContain("reconciled automatically");
     expect(upstreamExecutions).toBe(1);
     expect(fetchMock).toHaveBeenCalledWith(
       "https://provider.example.com/api/quote",
@@ -1169,6 +1170,27 @@ describe("marketplace api", () => {
         method: "POST"
       })
     );
+
+    await runMarketplaceWorkerCycle({
+      store,
+      refundService: {
+        async issueRefund() {
+          return { txHash: "0xmanualrecoveryrefund" };
+        }
+      }
+    });
+
+    const refunded = await request(app)
+      .post("/api/signals-recovery/quote")
+      .set("X-PAYMENT", Buffer.from(JSON.stringify({ paid: true })).toString("base64"))
+      .set("PAYMENT-IDENTIFIER", "payment_provider_sync_recovery_1")
+      .send({ symbol: "FAST" });
+
+    expect(refunded.status).toBe(409);
+    expect(refunded.body.error).toContain("refund handling has started");
+    expect(refunded.body.refund.status).toBe("sent");
+    expect(refunded.body.refund.txHash).toBe("0xmanualrecoveryrefund");
+    expect(upstreamExecutions).toBe(1);
   });
 
   it("supports variable topups and prepaid-credit execution with signed provider identity headers", async () => {

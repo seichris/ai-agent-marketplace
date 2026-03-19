@@ -365,6 +365,26 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     return clone(updated);
   }
 
+  async listStalePendingPaymentExecutions(updatedBefore: string, limit: number): Promise<IdempotencyRecord[]> {
+    const cutoff = Date.parse(updatedBefore);
+    if (Number.isNaN(cutoff) || limit <= 0) {
+      return [];
+    }
+
+    return Array.from(this.idempotencyByPaymentId.values())
+      .filter((record) => {
+        if (record.executionStatus !== "pending") {
+          return false;
+        }
+
+        const updatedAt = Date.parse(record.updatedAt);
+        return !Number.isNaN(updatedAt) && updatedAt <= cutoff;
+      })
+      .sort((left, right) => left.updatedAt.localeCompare(right.updatedAt))
+      .slice(0, limit)
+      .map((record) => clone(record));
+  }
+
   async saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord> {
     const now = timestamp();
     const existing = this.idempotencyByPaymentId.get(input.paymentId);
@@ -3237,6 +3257,25 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     }
 
     return this.getIdempotencyByPaymentId(paymentId);
+  }
+
+  async listStalePendingPaymentExecutions(updatedBefore: string, limit: number): Promise<IdempotencyRecord[]> {
+    if (limit <= 0) {
+      return [];
+    }
+
+    const result = await this.pool.query(
+      `
+      SELECT *
+      FROM idempotency_records
+      WHERE execution_status = 'pending'
+        AND updated_at <= $1
+      ORDER BY updated_at ASC
+      LIMIT $2
+      `,
+      [updatedBefore, limit]
+    );
+    return result.rows.map(mapIdempotencyRow);
   }
 
   async saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord> {

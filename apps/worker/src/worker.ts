@@ -1,6 +1,8 @@
 import {
+  PAYMENT_EXECUTION_RECOVERY_MS,
   createDefaultProviderRegistry,
   type MarketplaceStore,
+  type MarketplaceRoute,
   type PayoutService,
   type ProviderRegistry,
   type RefundService
@@ -102,6 +104,12 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
     }
   }
 
+  await recoverStalePendingPayments({
+    store: options.store,
+    refundService: options.refundService,
+    limit: options.limit ?? 10
+  });
+
   await backfillProviderPayouts({
     store: options.store,
     limit: options.limit ?? 10
@@ -113,6 +121,53 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
       payoutService: options.payoutService,
       limit: options.limit ?? 10
     });
+  }
+}
+
+function isPendingExecutionRecoverySafe(route: Pick<MarketplaceRoute, "executorKind">) {
+  return route.executorKind === "mock" || route.executorKind === "tavily" || route.executorKind === "marketplace";
+}
+
+async function recoverStalePendingPayments(input: {
+  store: MarketplaceStore;
+  refundService: RefundService;
+  limit: number;
+}) {
+  const staleBefore = new Date(Date.now() - PAYMENT_EXECUTION_RECOVERY_MS).toISOString();
+  const [pendingPayments, publishedRoutes] = await Promise.all([
+    input.store.listStalePendingPaymentExecutions(staleBefore, input.limit),
+    input.store.listPublishedRoutes()
+  ]);
+  const routesById = new Map(publishedRoutes.map((route) => [route.routeId, route]));
+
+  for (const payment of pendingPayments) {
+    const route = routesById.get(payment.routeId);
+    if (route && isPendingExecutionRecoverySafe(route)) {
+      continue;
+    }
+
+    const existingRefund = await input.store.getRefundByPaymentId(payment.paymentId);
+    if (existingRefund?.status === "sent") {
+      continue;
+    }
+
+    const refund = existingRefund ?? await input.store.createRefund({
+      paymentId: payment.paymentId,
+      wallet: payment.buyerWallet,
+      amount: payment.quotedPrice
+    });
+
+    try {
+      const receipt = await input.refundService.issueRefund({
+        wallet: payment.buyerWallet,
+        amount: payment.quotedPrice,
+        reason: `Automatic recovery refund for unresolved paid request ${payment.paymentId}.`
+      });
+      await input.store.markRefundSent(refund.id, receipt.txHash);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Unknown refund failure.";
+      await input.store.markRefundFailed(refund.id, message);
+    }
   }
 }
 
