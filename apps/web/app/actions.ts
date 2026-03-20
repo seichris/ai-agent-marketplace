@@ -24,6 +24,28 @@ export interface AdminLoginState {
   message: string;
 }
 
+async function finalizeAdminServiceMutation(input: {
+  serviceId: string;
+  returnTo: string;
+  successMessage: string;
+  fallbackErrorMessage: string;
+  mutate: () => Promise<unknown>;
+}): Promise<void> {
+  try {
+    await input.mutate();
+  } catch (error) {
+    redirect(buildAdminRedirect(
+      input.returnTo,
+      "error",
+      error instanceof Error ? error.message : input.fallbackErrorMessage
+    ));
+  }
+
+  revalidatePath("/admin/services");
+  revalidatePath(`/admin/services/${input.serviceId}`);
+  redirect(buildAdminRedirect(input.returnTo, "message", input.successMessage));
+}
+
 function buildAdminRedirect(path: string, key: "message" | "error", value: string): string {
   return `${path}?${key}=${encodeURIComponent(value)}`;
 }
@@ -136,21 +158,16 @@ export async function requestProviderServiceChangesAction(formData: FormData): P
     redirect(buildAdminRedirect(returnTo, "error", "Service id and review notes are required."));
   }
 
-  try {
-    await requestAdminProviderServiceChanges(serviceId, {
+  await finalizeAdminServiceMutation({
+    serviceId,
+    returnTo,
+    successMessage: "Requested provider changes.",
+    fallbackErrorMessage: "Failed to request provider changes.",
+    mutate: () => requestAdminProviderServiceChanges(serviceId, {
       reviewNotes,
       reviewerIdentity
-    });
-    revalidatePath("/admin/services");
-    revalidatePath(`/admin/services/${serviceId}`);
-    redirect(buildAdminRedirect(returnTo, "message", "Requested provider changes."));
-  } catch (error) {
-    redirect(buildAdminRedirect(
-      returnTo,
-      "error",
-      error instanceof Error ? error.message : "Failed to request provider changes."
-    ));
-  }
+    })
+  });
 }
 
 export async function publishProviderServiceAction(formData: FormData): Promise<void> {
@@ -167,27 +184,19 @@ export async function publishProviderServiceAction(formData: FormData): Promise<
     redirect(buildAdminRedirect(returnTo, "error", "Service id and settlement tier are required."));
   }
 
-  try {
-    await publishAdminProviderService(serviceId, {
-      reviewerIdentity,
-      settlementMode
-    });
-    revalidatePath("/admin/services");
-    revalidatePath(`/admin/services/${serviceId}`);
-    redirect(buildAdminRedirect(
-      returnTo,
-      "message",
+  await finalizeAdminServiceMutation({
+    serviceId,
+    returnTo,
+    successMessage:
       settlementMode === "verified_escrow"
         ? "Published service as Verified."
-        : "Published service as Community."
-    ));
-  } catch (error) {
-    redirect(buildAdminRedirect(
-      returnTo,
-      "error",
-      error instanceof Error ? error.message : "Failed to publish provider service."
-    ));
-  }
+        : "Published service as Community.",
+    fallbackErrorMessage: "Failed to publish provider service.",
+    mutate: () => publishAdminProviderService(serviceId, {
+      reviewerIdentity,
+      settlementMode
+    })
+  });
 }
 
 export async function updateProviderServiceSettlementModeAction(formData: FormData): Promise<void> {
@@ -204,27 +213,19 @@ export async function updateProviderServiceSettlementModeAction(formData: FormDa
     redirect(buildAdminRedirect(returnTo, "error", "Service id and settlement tier are required."));
   }
 
-  try {
-    await updateAdminProviderServiceSettlementMode(serviceId, {
-      reviewerIdentity,
-      settlementMode
-    });
-    revalidatePath("/admin/services");
-    revalidatePath(`/admin/services/${serviceId}`);
-    redirect(buildAdminRedirect(
-      returnTo,
-      "message",
+  await finalizeAdminServiceMutation({
+    serviceId,
+    returnTo,
+    successMessage:
       settlementMode === "verified_escrow"
         ? "Settlement tier updated to Verified."
-        : "Settlement tier updated to Community."
-    ));
-  } catch (error) {
-    redirect(buildAdminRedirect(
-      returnTo,
-      "error",
-      error instanceof Error ? error.message : "Failed to update settlement tier."
-    ));
-  }
+        : "Settlement tier updated to Community.",
+    fallbackErrorMessage: "Failed to update settlement tier.",
+    mutate: () => updateAdminProviderServiceSettlementMode(serviceId, {
+      reviewerIdentity,
+      settlementMode
+    })
+  });
 }
 
 export async function suspendProviderServiceAction(formData: FormData): Promise<void> {
@@ -241,19 +242,14 @@ export async function suspendProviderServiceAction(formData: FormData): Promise<
     redirect(buildAdminRedirect(returnTo, "error", "Service id is required."));
   }
 
-  try {
-    await suspendAdminProviderService(serviceId, {
+  await finalizeAdminServiceMutation({
+    serviceId,
+    returnTo,
+    successMessage: "Service suspended.",
+    fallbackErrorMessage: "Failed to suspend provider service.",
+    mutate: () => suspendAdminProviderService(serviceId, {
       reviewNotes,
       reviewerIdentity
-    });
-    revalidatePath("/admin/services");
-    revalidatePath(`/admin/services/${serviceId}`);
-    redirect(buildAdminRedirect(returnTo, "message", "Service suspended."));
-  } catch (error) {
-    redirect(buildAdminRedirect(
-      returnTo,
-      "error",
-      error instanceof Error ? error.message : "Failed to suspend provider service."
-    ));
-  }
+    })
+  });
 }
