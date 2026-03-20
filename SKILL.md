@@ -1,6 +1,6 @@
 ---
 name: fast-marketplace
-description: Discover services on the Fast Marketplace, choose the right endpoint, follow fixed-price x402, variable top-up, or prepaid-credit flows with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.example.com or api.marketplace.example.com, or manage marketplace supply from the provider/admin surfaces.
+description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.example.com or api.marketplace.example.com, or manage marketplace supply from the provider/admin surfaces.
 ---
 
 # Fast Marketplace
@@ -35,6 +35,7 @@ Before acting, identify:
 - the service or domain the user wants
 - the endpoint or outcome they need
 - whether the route is free, `fixed_x402`, `topup_x402_variable`, or `prepaid_credit`
+- whether the service settlement tier is `community_direct` or `verified_escrow`
 - whether the route is sync or async
 - whether they want browser login only, browser execution, or a CLI/agent-wallet flow
 - whether they already have a funded Fast wallet
@@ -59,6 +60,11 @@ Before acting, identify:
 7. For `prepaid_credit` routes, create an API-scoped wallet session through `/auth/challenge` and `/auth/session` or use `fast-marketplace auth api-session`; then invoke the route with the bearer token instead of x402 proof.
 8. If the route returns `202 Accepted`, store the `jobToken` and switch to wallet-bound retrieval.
 9. If the marketplace does not have the needed capability, submit a suggestion for an endpoint or source.
+
+Settlement implications:
+
+- `community_direct`: the x402 payment goes directly to the provider wallet; refunds and reimbursements are provider-owned
+- `verified_escrow`: the x402 payment goes to marketplace treasury; the marketplace can refund failures, reconcile stale payments, and settle provider payouts later
 
 ## Billing flows
 
@@ -96,6 +102,7 @@ Important constraints:
 - use the same request body when retrying a payable route
 - for safe retries, keep the same payment identifier for the same normalized request only
 - prepaid-credit routes require funded service credit and wallet-session bearer auth instead of per-call x402
+- Community/direct services still use verified provider onboarding and domain verification; the difference is money flow, not trust requirements
 
 ## Website auth flow
 
@@ -119,9 +126,10 @@ Important constraints:
 
 ## Refund flow
 
-1. If a sync paid trigger fails after payment verification, the marketplace may refund immediately.
-2. If an async job permanently fails after acceptance, the worker issues a treasury refund.
-3. Read the job retrieval payload or sync error payload for refund status, transaction hash, and any refund error details.
+1. If the service is `verified_escrow`, a sync paid trigger can refund immediately after payment verification failure.
+2. If the service is `verified_escrow` and an async job permanently fails after acceptance, the worker issues a treasury refund.
+3. If the service is `community_direct`, reimbursement is provider-owned because the buyer paid the provider wallet directly.
+4. Read the job retrieval payload or sync error payload for refund status, transaction hash, and any refund error details.
 
 ## Provider workflow
 
@@ -131,18 +139,22 @@ Important constraints:
 4. Open `/providers/services` and create or update the target service draft.
 5. Set the service metadata carefully: slug, API namespace, prompt intro, setup instructions, categories, website URL, and payout wallet.
 6. Add endpoint drafts with the exact request schema, response schema, examples, mode, and billing type.
-7. For `fixed_x402` endpoints, set the fixed price and upstream execution settings.
-8. For `topup_x402_variable` endpoints, set `minAmount` and `maxAmount`; the marketplace will own the top-up crediting flow.
-9. For `prepaid_credit` endpoints, rotate a provider runtime key from the service page, verify marketplace identity headers upstream, and use the provider runtime credit APIs to reserve, capture, and release buyer credit.
-10. If the service website host must be verified, create a verification challenge and publish the requested token at the expected URL.
-11. Verify website ownership from the provider review flow.
-12. Submit the service for marketplace review once the draft is complete and verified.
-13. After publish, use the public service page and paid proxy routes as the canonical execution surface.
+7. New provider services default to `community_direct`; providers cannot self-assign `verified_escrow` in v1.
+8. For `community_direct`, publish only sync HTTP `fixed_x402` routes and rotate a provider runtime key so the marketplace can forward signed buyer identity headers.
+9. For `verified_escrow`, `fixed_x402`, `topup_x402_variable`, and `prepaid_credit` are allowed once the service is promoted during review.
+10. For `topup_x402_variable` endpoints, set `minAmount` and `maxAmount`; the marketplace will own the top-up crediting flow.
+11. For `prepaid_credit` endpoints, rotate a provider runtime key from the service page, verify marketplace identity headers upstream, and use the provider runtime credit APIs to reserve, capture, and release buyer credit.
+12. If the service website host must be verified, create a verification challenge and publish the requested token at the expected URL.
+13. Verify website ownership from the provider review flow.
+14. Submit the service for marketplace review once the draft is complete and verified.
+15. After publish, use the public service page and paid proxy routes as the canonical execution surface.
 
 Important provider constraints:
 
 - provider drafts are scoped to the wallet that owns the provider profile
 - payout wallet validation happens at draft/update time
+- community-direct services need a provider runtime key before publish
+- top-up and prepaid-credit routes are Verified/escrow only
 - prepaid-credit services need a provider runtime key before they can debit marketplace-held credit
 - prepaid-credit upstreams should verify the signed marketplace identity headers before reserving or capturing credit
 - changing the service website host requires re-verification before submission
@@ -154,8 +166,11 @@ Important provider constraints:
 2. Open the internal review surfaces for suggestions and submitted provider services.
 3. Review suggestion intake, update statuses, and add operator notes as needed.
 4. Review submitted provider services for correctness, pricing, ownership verification, and marketplace fit.
-5. Publish approved services so they appear in the public catalog and route registry.
-6. Suspend services when they should no longer be publicly executable.
+5. Assign the settlement tier during publish:
+   `community_direct` for direct provider payment and provider-owned refunds
+   `verified_escrow` for marketplace escrow, refunds, prepaid credit, and provider payout settlement
+6. Publish approved services so they appear in the public catalog and route registry.
+7. Suspend services when they should no longer be publicly executable.
 
 ## Troubleshooting
 
@@ -165,8 +180,9 @@ Important provider constraints:
 - `401 Unauthorized` on job retrieval: create a wallet-bound session from the same paying wallet
 - `409 Conflict`: the payment identifier was reused with a different request body
 - insufficient prepaid credit: buy more service credit through the top-up route before retrying
-- permanent async failure after acceptance: the marketplace refund policy applies
+- permanent async failure after acceptance: escrow services use the marketplace refund policy; community/direct services require provider support
 - provider submission blocked: complete website verification or fix draft validation errors
+- provider community route blocked from publish: create a runtime key or switch the service to Verified during review
 - provider prepaid route failing upstream: confirm the runtime key, signed identity header verification, and reserve/capture/release flow
 - service website host changed: generate a new verification challenge and verify again
 - provider request claim conflict: another provider already claimed the request

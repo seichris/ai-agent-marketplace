@@ -1,6 +1,7 @@
 import { rawToDecimalString } from "./amounts.js";
 import { isFixedX402Billing, isPrepaidCreditBilling, isTopupX402Billing, quotedPriceRaw, routePriceLabel } from "./billing.js";
 import { getDefaultMarketplaceNetworkConfig } from "./network.js";
+import { settlementModeDescription, settlementModeLabel } from "./settlement.js";
 import type {
   MarketplaceRoute,
   ServiceAnalytics,
@@ -140,6 +141,9 @@ export function buildServiceSummary(input: {
     ownerName: input.service.ownerName,
     tagline: input.service.tagline,
     categories: input.service.categories,
+    settlementMode: input.service.settlementMode,
+    settlementLabel: settlementModeLabel(input.service.settlementMode),
+    settlementDescription: settlementModeDescription(input.service.settlementMode),
     priceRange: buildPriceRange(input.endpoints),
     settlementToken: getDefaultMarketplaceNetworkConfig().tokenSymbol,
     endpointCount: input.endpoints.length,

@@ -9,6 +9,31 @@ import {
 
 import { runMarketplaceWorkerCycle } from "./worker.js";
 
+function buildEscrowSplit(input: {
+  paymentDestinationWallet?: string;
+  providerAccountId: string;
+  providerWallet: string | null;
+  marketplaceAmount: string;
+  providerAmount: string;
+  marketplaceBps: number;
+  providerBps: number;
+}) {
+  return {
+    currency: "fastUSDC" as const,
+    settlementMode: "verified_escrow" as const,
+    paymentDestinationWallet:
+      input.paymentDestinationWallet ?? "fast1marketplacetreasury000000000000000000000000000000000000",
+    usesTreasurySettlement: true,
+    marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
+    marketplaceBps: input.marketplaceBps,
+    marketplaceAmount: input.marketplaceAmount,
+    providerAccountId: input.providerAccountId,
+    providerWallet: input.providerWallet,
+    providerBps: input.providerBps,
+    providerAmount: input.providerAmount
+  };
+}
+
 describe("marketplace worker", () => {
   it("refunds a permanently failed async job", async () => {
     const store = new InMemoryMarketplaceStore();
@@ -23,16 +48,14 @@ describe("marketplace worker", () => {
       buyerWallet,
       route: asyncRoute!,
       quotedPrice: "150000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
-        marketplaceBps: 10000,
-        marketplaceAmount: "150000",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "mock",
         providerWallet: null,
+        marketplaceBps: 10000,
+        marketplaceAmount: "150000",
         providerBps: 0,
         providerAmount: "0"
-      },
+      }),
       paymentPayload: "payload",
       facilitatorResponse: { isValid: true },
       jobToken: "job_worker_1",
@@ -92,16 +115,14 @@ describe("marketplace worker", () => {
         }
       },
       quotedPrice: "200000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
-        marketplaceBps: 0,
-        marketplaceAmount: "0",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "provider_1",
         providerWallet,
+        marketplaceBps: 0,
+        marketplaceAmount: "0",
         providerBps: 10_000,
         providerAmount: "200000"
-      },
+      }),
       paymentPayload: "payload",
       facilitatorResponse: { isValid: true },
       jobToken: "job_worker_2",
@@ -164,16 +185,14 @@ describe("marketplace worker", () => {
       routeId: "orders.quote.v1",
       routeVersion: "v1",
       quotedPrice: "200000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
-        marketplaceBps: 0,
-        marketplaceAmount: "0",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "provider_1",
         providerWallet,
+        marketplaceBps: 0,
+        marketplaceAmount: "0",
         providerBps: 10_000,
         providerAmount: "200000"
-      },
+      }),
       paymentPayload: "payload-1",
       facilitatorResponse: { isValid: true },
       statusCode: 200,
@@ -188,16 +207,14 @@ describe("marketplace worker", () => {
       routeId: "orders.topup.v1",
       routeVersion: "v1",
       quotedPrice: "300000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
-        marketplaceBps: 0,
-        marketplaceAmount: "0",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "provider_1",
         providerWallet,
+        marketplaceBps: 0,
+        marketplaceAmount: "0",
         providerBps: 10_000,
         providerAmount: "300000"
-      },
+      }),
       paymentPayload: "payload-2",
       facilitatorResponse: { isValid: true },
       statusCode: 200,
@@ -238,16 +255,14 @@ describe("marketplace worker", () => {
       routeVersion: "v1",
       pendingRecoveryAction: "refund",
       quotedPrice: "125000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
-        marketplaceBps: 10_000,
-        marketplaceAmount: "125000",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "mock",
         providerWallet: null,
+        marketplaceBps: 10_000,
+        marketplaceAmount: "125000",
         providerBps: 0,
         providerAmount: "0"
-      },
+      }),
       paymentPayload: "payload-refund-1",
       facilitatorResponse: { isValid: true },
       responseKind: "sync",

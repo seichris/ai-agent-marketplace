@@ -40,6 +40,7 @@ import {
   requiresWalletSession,
   requiresX402Payment,
   buildMarketplaceIdentityHeaders,
+  usesMarketplaceTreasurySettlement,
   validateJsonSchema,
   verifySessionToken,
   verifyWalletChallenge,
@@ -66,6 +67,7 @@ import {
   type PublishedServiceVersionRecord,
   type RefundService,
   type RouteBillingType,
+  type SettlementMode,
   type SuggestionRecord,
   type UpdateProviderEndpointDraftInput,
   type UpstreamAuthMode
@@ -176,7 +178,13 @@ const reviewRequestSchema = z.object({
 });
 
 const publishSchema = z.object({
-  reviewerIdentity: z.string().min(1).max(120).optional().nullable()
+  reviewerIdentity: z.string().min(1).max(120).optional().nullable(),
+  settlementMode: z.enum(["community_direct", "verified_escrow"]).optional().nullable()
+});
+
+const settlementModeUpdateSchema = z.object({
+  reviewerIdentity: z.string().min(1).max(120).optional().nullable(),
+  settlementMode: z.enum(["community_direct", "verified_escrow"])
 });
 
 const suspendSchema = z.object({
@@ -1144,7 +1152,64 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
       return res.status(400).json({ error: "Publish request validation failed.", issues: parsed.error.issues });
     }
 
-    const updated = await options.store.publishProviderService(req.params.id, parsed.data);
+    const detail = await options.store.getAdminProviderService(req.params.id);
+    if (!detail) {
+      return res.status(404).json({ error: "Provider service not found." });
+    }
+
+    const settlementMode = parsed.data.settlementMode ?? detail.service.settlementMode;
+    const validationDetail = (await options.store.getSubmittedProviderService(req.params.id)) ?? detail;
+    const publishValidation = await validateProviderServiceForSettlement({
+      detail: validationDetail,
+      store: options.store,
+      settlementMode
+    });
+    if (!publishValidation.ok) {
+      return res.status(publishValidation.statusCode).json({ error: publishValidation.error });
+    }
+
+    const updated = await options.store.publishProviderService(req.params.id, {
+      reviewerIdentity: parsed.data.reviewerIdentity,
+      settlementMode,
+      submittedVersionId: validationDetail.latestReview?.submittedVersionId ?? null
+    });
+    if (!updated) {
+      return res.status(404).json({ error: "Provider service not found." });
+    }
+
+    return res.json(updated);
+  });
+
+  app.patch("/internal/provider-services/:id/settlement-mode", async (req, res) => {
+    if (!requireAdminToken(req, res, options.adminToken)) {
+      return;
+    }
+
+    const parsed = settlementModeUpdateSchema.safeParse(req.body ?? {});
+    if (!parsed.success) {
+      return res.status(400).json({ error: "Settlement mode update validation failed.", issues: parsed.error.issues });
+    }
+
+    const detail = await options.store.getAdminProviderService(req.params.id);
+    if (!detail) {
+      return res.status(404).json({ error: "Provider service not found." });
+    }
+
+    const validationDetail = (await options.store.getSubmittedProviderService(req.params.id)) ?? detail;
+    const validation = await validateProviderServiceForSettlement({
+      detail: validationDetail,
+      store: options.store,
+      settlementMode: parsed.data.settlementMode
+    });
+    if (!validation.ok) {
+      return res.status(validation.statusCode).json({ error: validation.error });
+    }
+
+    const updated = await options.store.updateProviderServiceSettlementMode(req.params.id, {
+      ...parsed.data,
+      submittedVersionId: validationDetail.latestReview?.submittedVersionId ?? null,
+      publishedVersionId: detail.latestPublishedVersionId
+    });
     if (!updated) {
       return res.status(404).json({ error: "Provider service not found." });
     }
@@ -1325,6 +1390,10 @@ async function handlePrepaidCreditRoute(input: {
   secretsKey: string;
   tavilyApiKey?: string;
 }) {
+  if (input.route.settlementMode !== "verified_escrow") {
+    return input.res.status(500).json({ error: "Prepaid-credit routes require Verified escrow settlement." });
+  }
+
   const session = requireApiSession(input.req, input.res, input.sessionSecret, input.route.routeId);
   if (!session) {
     return;
@@ -1364,19 +1433,36 @@ async function handleX402Route(input: {
   secretsKey: string;
   tavilyApiKey?: string;
 }) {
+  if (
+    input.route.settlementMode === "community_direct"
+    && (input.route.mode !== "sync" || input.route.executorKind !== "http" || input.route.billing.type !== "fixed_x402")
+  ) {
+    return input.res.status(500).json({
+      error: "Community settlement only supports sync HTTP fixed_x402 routes."
+    });
+  }
+
   const requestBody = input.req.body ?? {};
   const paymentHeaders = normalizePaymentHeaders(
     input.req.headers as Record<string, string | string[] | undefined>
   );
+  let paymentDestinationWallet: string;
+  try {
+    paymentDestinationWallet = resolvePaymentDestinationWallet(input.route, input.payTo);
+  } catch (error) {
+    return input.res.status(500).json({
+      error: error instanceof Error ? error.message : "Route settlement configuration is invalid."
+    });
+  }
 
   let requiredBody: ReturnType<typeof buildPaymentRequiredResponse>;
   let requiredHeaders: Record<string, string>;
   let paymentRequirement: ReturnType<typeof buildPaymentRequirementForRoute>;
   let quotedPrice: string;
   try {
-    requiredBody = buildPaymentRequiredResponse(input.route, input.payTo, requestBody);
-    requiredHeaders = buildPaymentRequiredHeaders(input.route, input.payTo, requestBody);
-    paymentRequirement = buildPaymentRequirementForRoute(input.route, input.payTo, requestBody);
+    requiredBody = buildPaymentRequiredResponse(input.route, paymentDestinationWallet, requestBody);
+    requiredHeaders = buildPaymentRequiredHeaders(input.route, paymentDestinationWallet, requestBody);
+    paymentRequirement = buildPaymentRequirementForRoute(input.route, paymentDestinationWallet, requestBody);
     quotedPrice = quotedPriceRaw(input.route, requestBody);
   } catch (error) {
     return input.res.status(400).json({
@@ -1431,7 +1517,8 @@ async function handleX402Route(input: {
   const requestHash = hashNormalizedRequest(input.route, requestBody);
   const payoutSplit = buildPayoutSplit({
     route: input.route,
-    marketplaceWallet: input.payTo,
+    treasuryWallet: input.payTo,
+    paymentDestinationWallet,
     quotedPrice
   });
   const paymentResponseHeaders = buildPaymentResponseHeaders({
@@ -1866,8 +1953,8 @@ async function executeHttpRoute(input: {
           signingSecret
         })
       );
-    } else if (isPrepaidCreditBilling(input.route)) {
-      throw new Error("Provider runtime key is required for prepaid-credit routes.");
+    } else if (input.route.settlementMode === "community_direct" || isPrepaidCreditBilling(input.route)) {
+      throw new Error("Provider runtime key is required for this settlement flow.");
     }
   }
 
@@ -1966,6 +2053,21 @@ async function buildRejectedSyncResponse(input: {
   store: MarketplaceStore;
   refundService: RefundService;
 }) {
+  if (!usesMarketplaceTreasurySettlement(input.route.settlementMode)) {
+    return {
+      statusCode: input.executeResult.statusCode,
+      headers: {
+        "content-type": "application/json"
+      },
+      body: {
+        error: "Upstream request failed after a direct provider payment. Contact the provider for reimbursement or refund.",
+        upstreamStatus: input.executeResult.statusCode,
+        upstreamBody: input.executeResult.body,
+        settlementMode: input.route.settlementMode
+      }
+    };
+  }
+
   const refund = await input.store.createRefund({
     paymentId: input.paymentId,
     wallet: input.buyerWallet,
@@ -2017,10 +2119,23 @@ async function buildRejectedSyncResponse(input: {
   }
 }
 
+function resolvePaymentDestinationWallet(route: PublishedEndpointVersionRecord, treasuryWallet: string): string {
+  if (usesMarketplaceTreasurySettlement(route.settlementMode)) {
+    return treasuryWallet;
+  }
+
+  if (!route.payout.providerWallet) {
+    throw new Error(`Community route ${route.routeId} is missing a provider payout wallet.`);
+  }
+
+  return route.payout.providerWallet;
+}
+
 async function persistProviderPayoutSafely(
   store: MarketplaceStore,
   input: {
     payoutSplit: {
+      usesTreasurySettlement?: boolean;
       providerAmount: string;
       providerWallet: string | null;
       providerAccountId: string;
@@ -2030,7 +2145,11 @@ async function persistProviderPayoutSafely(
     sourceId: string;
   }
 ) {
-  if (BigInt(input.payoutSplit.providerAmount) <= 0n || !input.payoutSplit.providerWallet) {
+  if (
+    input.payoutSplit.usesTreasurySettlement === false
+    || BigInt(input.payoutSplit.providerAmount) <= 0n
+    || !input.payoutSplit.providerWallet
+  ) {
     return;
   }
 
@@ -2212,6 +2331,62 @@ async function validateProviderServiceForSubmit(detail: ProviderServiceDetailRec
         error: "All endpoint upstream hosts must match the service website host or a subdomain."
       };
     }
+  }
+
+  return { ok: true as const };
+}
+
+function isCommunityDirectPublishCompatible(detail: ProviderServiceDetailRecord): boolean {
+  return detail.endpoints.every((endpoint) =>
+    endpoint.mode === "sync"
+    && endpoint.billing.type === "fixed_x402"
+    && endpoint.executorKind === "http"
+  );
+}
+
+async function validateProviderServiceForSettlement(input: {
+  detail: ProviderServiceDetailRecord;
+  store: MarketplaceStore;
+  settlementMode: SettlementMode;
+}) {
+  const baseValidation = await validateProviderServiceForSubmit(input.detail);
+  if (!baseValidation.ok) {
+    return baseValidation;
+  }
+
+  const runtimeKey = await input.store.getProviderRuntimeKeyForOwner(
+    input.detail.service.id,
+    input.detail.account.ownerWallet
+  );
+
+  if (input.settlementMode === "community_direct") {
+    if (!runtimeKey) {
+      return {
+        ok: false as const,
+        statusCode: 400,
+        error: "Community services require a provider runtime key before publish."
+      };
+    }
+
+    if (!isCommunityDirectPublishCompatible(input.detail)) {
+      return {
+        ok: false as const,
+        statusCode: 400,
+        error:
+          "Community services must use sync HTTP fixed_x402 endpoints only. Variable top-ups, prepaid credit, async, and marketplace executors require Verified escrow."
+      };
+    }
+  }
+
+  if (
+    input.detail.endpoints.some((endpoint) => endpoint.billing.type === "prepaid_credit")
+    && !runtimeKey
+  ) {
+    return {
+      ok: false as const,
+      statusCode: 400,
+      error: "Prepaid-credit services require a provider runtime key before publish."
+    };
   }
 
   return { ok: true as const };
@@ -2441,8 +2616,13 @@ function isPendingExecutionRecoverable(record: IdempotencyRecord) {
   return Date.now() - updatedAt >= PAYMENT_EXECUTION_RECOVERY_MS;
 }
 
-function pendingPaymentRecoveryActionForRoute(route: Pick<PublishedEndpointVersionRecord, "executorKind">) {
-  return route.executorKind === "mock" || route.executorKind === "tavily" || route.executorKind === "marketplace"
+function pendingPaymentRecoveryActionForRoute(
+  route: Pick<PublishedEndpointVersionRecord, "executorKind" | "settlementMode">
+) {
+  return ("settlementMode" in route && route.settlementMode === "community_direct")
+    || route.executorKind === "mock"
+    || route.executorKind === "tavily"
+    || route.executorKind === "marketplace"
     ? "retry"
     : "refund";
 }

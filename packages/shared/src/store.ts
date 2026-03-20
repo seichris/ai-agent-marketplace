@@ -6,6 +6,7 @@ import { rawToDecimalString } from "./amounts.js";
 import { createDraftRouteBilling, normalizeRouteBilling } from "./billing.js";
 import { getDefaultMarketplaceNetworkConfig } from "./network.js";
 import { hashProviderRuntimeKey } from "./provider-runtime.js";
+import { usesMarketplaceTreasurySettlement } from "./settlement.js";
 import {
   MARKETPLACE_PROVIDER_SERVICE_SEEDS,
   MARKETPLACE_PROVIDER_ACCOUNT_SEED,
@@ -48,6 +49,7 @@ import type {
   SaveAsyncAcceptanceInput,
   SaveSyncIdempotencyInput,
   ServiceAnalytics,
+  SettlementMode,
   SuggestionRecord,
   SuggestionStatus,
   UpdateProviderEndpointDraftInput,
@@ -113,6 +115,77 @@ function buildProviderServiceDetail(input: {
     latestReview: clone(input.latestReview),
     latestPublishedVersionId: input.latestPublishedVersionId
   };
+}
+
+function mapPublishedServiceVersionToProviderService(version: PublishedServiceVersionRecord): ProviderServiceRecord {
+  return {
+    id: version.serviceId,
+    providerAccountId: version.providerAccountId,
+    settlementMode: version.settlementMode,
+    slug: version.slug,
+    apiNamespace: version.apiNamespace,
+    name: version.name,
+    tagline: version.tagline,
+    about: version.about,
+    categories: clone(version.categories),
+    promptIntro: version.promptIntro,
+    setupInstructions: clone(version.setupInstructions),
+    websiteUrl: version.websiteUrl,
+    payoutWallet: version.payoutWallet,
+    featured: version.featured,
+    status: version.status,
+    createdAt: version.createdAt,
+    updatedAt: version.updatedAt
+  };
+}
+
+function mapPublishedEndpointVersionToProviderDraft(
+  endpoint: PublishedEndpointVersionRecord
+): ProviderEndpointDraftRecord {
+  return {
+    id: endpoint.endpointDraftId ?? endpoint.endpointVersionId,
+    serviceId: endpoint.serviceId,
+    routeId: endpoint.routeId,
+    operation: endpoint.operation,
+    title: endpoint.title,
+    description: endpoint.description,
+    price: endpoint.price,
+    billing: clone(endpoint.billing),
+    mode: endpoint.mode,
+    requestSchemaJson: clone(endpoint.requestSchemaJson),
+    responseSchemaJson: clone(endpoint.responseSchemaJson),
+    requestExample: clone(endpoint.requestExample),
+    responseExample: clone(endpoint.responseExample),
+    usageNotes: endpoint.usageNotes ?? null,
+    executorKind: endpoint.executorKind,
+    upstreamBaseUrl: endpoint.upstreamBaseUrl ?? null,
+    upstreamPath: endpoint.upstreamPath ?? null,
+    upstreamAuthMode: endpoint.upstreamAuthMode ?? null,
+    upstreamAuthHeaderName: endpoint.upstreamAuthHeaderName ?? null,
+    upstreamSecretRef: endpoint.upstreamSecretRef ?? null,
+    hasUpstreamSecret: Boolean(endpoint.upstreamSecretRef),
+    payout: clone(endpoint.payout),
+    createdAt: endpoint.createdAt,
+    updatedAt: endpoint.updatedAt
+  };
+}
+
+function buildSubmittedProviderServiceDetail(input: {
+  version: PublishedServiceVersionRecord;
+  account: ProviderAccountRecord;
+  endpoints: PublishedEndpointVersionRecord[];
+  verification: ProviderVerificationRecord | null;
+  latestReview: ProviderReviewRecord | null;
+  latestPublishedVersionId: string | null;
+}): ProviderServiceDetailRecord {
+  return buildProviderServiceDetail({
+    service: mapPublishedServiceVersionToProviderService(input.version),
+    account: input.account,
+    endpoints: input.endpoints.map(mapPublishedEndpointVersionToProviderDraft),
+    verification: input.verification,
+    latestReview: input.latestReview,
+    latestPublishedVersionId: input.latestPublishedVersionId
+  });
 }
 
 function computeServiceAnalytics(input: {
@@ -253,6 +326,41 @@ function buildStoredTopupResponseBody(input: {
       ...clone(input.entry),
       amountDecimal: rawToDecimalString(input.entry.amount, 6)
     }
+  };
+}
+
+function normalizeSettlementMode(
+  mode: SettlementMode | null | undefined,
+  fallback: SettlementMode = "verified_escrow"
+): SettlementMode {
+  return mode === "community_direct" || mode === "verified_escrow" ? mode : fallback;
+}
+
+function settlementModeForNewProviderService(): SettlementMode {
+  return "community_direct";
+}
+
+function normalizePersistedPayoutSplit(
+  split: IdempotencyRecord["payoutSplit"] | JobRecord["payoutSplit"]
+): IdempotencyRecord["payoutSplit"] {
+  const settlementMode = normalizeSettlementMode(
+    (split as { settlementMode?: SettlementMode | null }).settlementMode,
+    "verified_escrow"
+  );
+  const legacyMarketplaceWallet = (split as { marketplaceWallet?: string | null }).marketplaceWallet ?? "";
+  const paymentDestinationWallet =
+    (split as { paymentDestinationWallet?: string | null }).paymentDestinationWallet
+    ?? (settlementMode === "community_direct"
+      ? ((split as { providerWallet?: string | null }).providerWallet ?? legacyMarketplaceWallet)
+      : legacyMarketplaceWallet);
+
+  return {
+    ...split,
+    settlementMode,
+    paymentDestinationWallet,
+    usesTreasurySettlement:
+      (split as { usesTreasurySettlement?: boolean | null }).usesTreasurySettlement
+      ?? usesMarketplaceTreasurySettlement(settlementMode)
   };
 }
 
@@ -778,6 +886,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
         || record.responseStatusCode < 200
         || record.responseStatusCode >= 400
         || !record.providerPayoutSourceKind
+        || !record.payoutSplit.usesTreasurySettlement
         || !record.payoutSplit.providerWallet
         || BigInt(record.payoutSplit.providerAmount) <= 0n
       ) {
@@ -804,6 +913,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
 
       if (
         job.status !== "completed"
+        || !job.payoutSplit.usesTreasurySettlement
         || !job.payoutSplit.providerWallet
         || BigInt(job.payoutSplit.providerAmount) <= 0n
       ) {
@@ -969,7 +1079,11 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       this.creditTopupEntryIdByPaymentKey.set(topupLookupKey, entry.id);
     }
 
-    if (BigInt(input.payoutSplit.providerAmount) > 0n && input.payoutSplit.providerWallet) {
+    if (
+      input.payoutSplit.usesTreasurySettlement
+      && BigInt(input.payoutSplit.providerAmount) > 0n
+      && input.payoutSplit.providerWallet
+    ) {
       const existingPayout = Array.from(this.providerPayoutsById.values()).find(
         (record) => record.sourceKind === "credit_topup" && record.sourceId === input.paymentId
       );
@@ -1590,6 +1704,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     const record: ProviderServiceRecord = {
       id: randomUUID(),
       providerAccountId: account.id,
+      settlementMode: settlementModeForNewProviderService(),
       slug: input.slug,
       apiNamespace: input.apiNamespace,
       name: input.name,
@@ -1867,6 +1982,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       versionId: serviceVersionId,
       serviceId,
       providerAccountId: detail.account.id,
+      settlementMode: detail.service.settlementMode,
       slug: detail.service.slug,
       apiNamespace: detail.service.apiNamespace,
       name: detail.service.name,
@@ -1898,6 +2014,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       provider: detail.service.apiNamespace,
       operation: endpoint.operation,
       version: versionTag,
+      settlementMode: detail.service.settlementMode,
       mode: endpoint.mode,
       network: network.paymentNetwork,
       price: endpoint.price,
@@ -1966,6 +2083,32 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
     return this.buildProviderServiceDetail(serviceId);
   }
 
+  async getSubmittedProviderService(serviceId: string): Promise<ProviderServiceDetailRecord | null> {
+    const detail = await this.getAdminProviderService(serviceId);
+    const submittedVersionId = detail?.latestReview?.submittedVersionId ?? null;
+    if (!detail || !submittedVersionId) {
+      return null;
+    }
+
+    const version = this.publishedServicesByVersionId.get(submittedVersionId);
+    if (!version) {
+      return null;
+    }
+
+    const endpoints = Array.from(this.publishedEndpointsByVersionId.values())
+      .filter((endpoint) => endpoint.serviceVersionId === submittedVersionId)
+      .sort((left, right) => left.operation.localeCompare(right.operation));
+
+    return buildSubmittedProviderServiceDetail({
+      version,
+      account: detail.account,
+      endpoints,
+      verification: detail.verification,
+      latestReview: detail.latestReview,
+      latestPublishedVersionId: detail.latestPublishedVersionId
+    });
+  }
+
   async requestProviderServiceChanges(
     serviceId: string,
     input: { reviewNotes: string; reviewerIdentity?: string | null }
@@ -2005,35 +2148,61 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
 
   async publishProviderService(
     serviceId: string,
-    input?: { reviewerIdentity?: string | null }
+    input?: { reviewerIdentity?: string | null; settlementMode?: SettlementMode | null; submittedVersionId?: string | null }
   ): Promise<ProviderServiceDetailRecord | null> {
     const service = this.providerServicesById.get(serviceId);
-    const latestReview = latestByCreatedAt(this.reviewsByService.get(serviceId) ?? []);
-    if (!service || !latestReview) {
+    if (!service) {
       return null;
     }
 
-    const version = this.publishedServicesByVersionId.get(latestReview.submittedVersionId);
+    const submittedVersionId = input?.submittedVersionId ?? latestByCreatedAt(this.reviewsByService.get(serviceId) ?? [])?.submittedVersionId ?? null;
+    if (!submittedVersionId) {
+      return null;
+    }
+
+    const submittedReview = (this.reviewsByService.get(serviceId) ?? []).find(
+      (review) => review.submittedVersionId === submittedVersionId
+    );
+    if (!submittedReview) {
+      return null;
+    }
+
+    const version = this.publishedServicesByVersionId.get(submittedVersionId);
     if (!version) {
       return null;
     }
 
+    const settlementMode = normalizeSettlementMode(input?.settlementMode ?? service.settlementMode, service.settlementMode);
+
     this.latestPublishedVersionByServiceId.set(serviceId, version.versionId);
     this.providerServicesById.set(serviceId, {
       ...service,
+      settlementMode,
       status: "published",
       updatedAt: timestamp()
     });
     this.publishedServicesByVersionId.set(version.versionId, {
       ...version,
+      settlementMode,
       status: "published",
       publishedAt: timestamp(),
       updatedAt: timestamp()
     });
+    for (const [endpointVersionId, endpoint] of this.publishedEndpointsByVersionId.entries()) {
+      if (endpoint.serviceVersionId !== version.versionId) {
+        continue;
+      }
+
+      this.publishedEndpointsByVersionId.set(endpointVersionId, {
+        ...endpoint,
+        settlementMode,
+        updatedAt: timestamp()
+      });
+    }
     this.reviewsByService.set(
       serviceId,
       (this.reviewsByService.get(serviceId) ?? []).map((record) =>
-        record.id === latestReview.id
+        record.id === submittedReview.id
           ? {
               ...record,
               status: "published",
@@ -2043,6 +2212,78 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
           : record
       )
     );
+
+    return this.buildProviderServiceDetail(serviceId);
+  }
+
+  async updateProviderServiceSettlementMode(
+    serviceId: string,
+    input: {
+      settlementMode: SettlementMode;
+      reviewerIdentity?: string | null;
+      submittedVersionId?: string | null;
+      publishedVersionId?: string | null;
+    }
+  ): Promise<ProviderServiceDetailRecord | null> {
+    const service = this.providerServicesById.get(serviceId);
+    if (!service) {
+      return null;
+    }
+
+    const settlementMode = normalizeSettlementMode(input.settlementMode, service.settlementMode);
+    this.providerServicesById.set(serviceId, {
+      ...service,
+      settlementMode,
+      updatedAt: timestamp()
+    });
+
+    const latestSubmittedVersionId = input.submittedVersionId ?? this.latestSubmittedVersionByServiceId.get(serviceId);
+    if (latestSubmittedVersionId) {
+      const latestSubmittedVersion = this.publishedServicesByVersionId.get(latestSubmittedVersionId);
+      if (latestSubmittedVersion) {
+        this.publishedServicesByVersionId.set(latestSubmittedVersionId, {
+          ...latestSubmittedVersion,
+          settlementMode,
+          updatedAt: timestamp()
+        });
+      }
+
+      for (const [endpointVersionId, endpoint] of this.publishedEndpointsByVersionId.entries()) {
+        if (endpoint.serviceVersionId !== latestSubmittedVersionId) {
+          continue;
+        }
+
+        this.publishedEndpointsByVersionId.set(endpointVersionId, {
+          ...endpoint,
+          settlementMode,
+          updatedAt: timestamp()
+        });
+      }
+    }
+
+    const latestPublishedVersionId = input.publishedVersionId ?? this.latestPublishedVersionByServiceId.get(serviceId);
+    if (latestPublishedVersionId && latestPublishedVersionId !== latestSubmittedVersionId) {
+      const latestPublishedVersion = this.publishedServicesByVersionId.get(latestPublishedVersionId);
+      if (latestPublishedVersion) {
+        this.publishedServicesByVersionId.set(latestPublishedVersionId, {
+          ...latestPublishedVersion,
+          settlementMode,
+          updatedAt: timestamp()
+        });
+      }
+
+      for (const [endpointVersionId, endpoint] of this.publishedEndpointsByVersionId.entries()) {
+        if (endpoint.serviceVersionId !== latestPublishedVersionId) {
+          continue;
+        }
+
+        this.publishedEndpointsByVersionId.set(endpointVersionId, {
+          ...endpoint,
+          settlementMode,
+          updatedAt: timestamp()
+        });
+      }
+    }
 
     return this.buildProviderServiceDetail(serviceId);
   }
@@ -2402,6 +2643,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       CREATE TABLE IF NOT EXISTS provider_services (
         id TEXT PRIMARY KEY,
         provider_account_id TEXT NOT NULL REFERENCES provider_accounts(id),
+        settlement_mode TEXT NOT NULL DEFAULT 'community_direct',
         slug TEXT NOT NULL UNIQUE,
         api_namespace TEXT NOT NULL UNIQUE,
         name TEXT NOT NULL,
@@ -2474,6 +2716,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         version_id TEXT PRIMARY KEY,
         service_id TEXT NOT NULL REFERENCES provider_services(id) ON DELETE CASCADE,
         provider_account_id TEXT NOT NULL REFERENCES provider_accounts(id),
+        settlement_mode TEXT NOT NULL DEFAULT 'verified_escrow',
         slug TEXT NOT NULL,
         api_namespace TEXT NOT NULL,
         name TEXT NOT NULL,
@@ -2504,6 +2747,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         provider TEXT NOT NULL,
         operation TEXT NOT NULL,
         version TEXT NOT NULL,
+        settlement_mode TEXT NOT NULL DEFAULT 'verified_escrow',
         mode TEXT NOT NULL,
         network TEXT NOT NULL,
         price TEXT NOT NULL,
@@ -2702,8 +2946,49 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ALTER TABLE provider_endpoint_drafts
       ADD COLUMN IF NOT EXISTS billing JSONB NOT NULL DEFAULT '{}'::jsonb;
 
+      ALTER TABLE provider_services
+      ADD COLUMN IF NOT EXISTS settlement_mode TEXT;
+
+      ALTER TABLE published_service_versions
+      ADD COLUMN IF NOT EXISTS settlement_mode TEXT;
+
+      ALTER TABLE published_endpoint_versions
+      ADD COLUMN IF NOT EXISTS settlement_mode TEXT;
+
       ALTER TABLE published_endpoint_versions
       ADD COLUMN IF NOT EXISTS billing JSONB NOT NULL DEFAULT '{}'::jsonb;
+
+      UPDATE provider_services
+      SET settlement_mode = 'verified_escrow'
+      WHERE settlement_mode IS NULL;
+
+      UPDATE published_service_versions versions
+      SET settlement_mode = COALESCE(
+        versions.settlement_mode,
+        services.settlement_mode,
+        'verified_escrow'
+      )
+      FROM provider_services services
+      WHERE versions.service_id = services.id
+        AND versions.settlement_mode IS NULL;
+
+      UPDATE published_service_versions
+      SET settlement_mode = 'verified_escrow'
+      WHERE settlement_mode IS NULL;
+
+      UPDATE published_endpoint_versions endpoints
+      SET settlement_mode = COALESCE(
+        endpoints.settlement_mode,
+        versions.settlement_mode,
+        'verified_escrow'
+      )
+      FROM published_service_versions versions
+      WHERE endpoints.service_version_id = versions.version_id
+        AND endpoints.settlement_mode IS NULL;
+
+      UPDATE published_endpoint_versions
+      SET settlement_mode = 'verified_escrow'
+      WHERE settlement_mode IS NULL;
 
       UPDATE idempotency_records records
       SET pending_recovery_action = CASE
@@ -2727,6 +3012,24 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
       ALTER TABLE idempotency_records
       ALTER COLUMN pending_recovery_action SET NOT NULL;
+
+      ALTER TABLE provider_services
+      ALTER COLUMN settlement_mode SET DEFAULT 'community_direct';
+
+      ALTER TABLE provider_services
+      ALTER COLUMN settlement_mode SET NOT NULL;
+
+      ALTER TABLE published_service_versions
+      ALTER COLUMN settlement_mode SET DEFAULT 'verified_escrow';
+
+      ALTER TABLE published_service_versions
+      ALTER COLUMN settlement_mode SET NOT NULL;
+
+      ALTER TABLE published_endpoint_versions
+      ALTER COLUMN settlement_mode SET DEFAULT 'verified_escrow';
+
+      ALTER TABLE published_endpoint_versions
+      ALTER COLUMN settlement_mode SET NOT NULL;
 
       UPDATE provider_endpoint_drafts
       SET billing = jsonb_build_object('type', 'fixed_x402', 'price', price)
@@ -2780,6 +3083,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ["provider_accounts", "contact_email"],
       ["provider_services", "slug"],
       ["provider_services", "api_namespace"],
+      ["provider_services", "settlement_mode"],
       ["provider_services", "name"],
       ["provider_services", "tagline"],
       ["provider_services", "about"],
@@ -2811,6 +3115,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ["provider_reviews", "reviewer_identity"],
       ["published_service_versions", "slug"],
       ["published_service_versions", "api_namespace"],
+      ["published_service_versions", "settlement_mode"],
       ["published_service_versions", "name"],
       ["published_service_versions", "owner_name"],
       ["published_service_versions", "tagline"],
@@ -2825,6 +3130,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       ["published_endpoint_versions", "provider"],
       ["published_endpoint_versions", "operation"],
       ["published_endpoint_versions", "version"],
+      ["published_endpoint_versions", "settlement_mode"],
       ["published_endpoint_versions", "mode"],
       ["published_endpoint_versions", "network"],
       ["published_endpoint_versions", "price"],
@@ -2972,14 +3278,15 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         await client.query(
           `
           INSERT INTO provider_services (
-            id, provider_account_id, slug, api_namespace, name, tagline, about, categories, prompt_intro,
+            id, provider_account_id, settlement_mode, slug, api_namespace, name, tagline, about, categories, prompt_intro,
             setup_instructions, website_url, payout_wallet, featured, status, latest_submitted_version_id,
             latest_published_version_id, latest_review_id, created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, $14, $15, $16, NULL, $17, $18
+            $1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, $15, $16, $17, NULL, $18, $19
           )
           ON CONFLICT (id) DO UPDATE SET
             provider_account_id = EXCLUDED.provider_account_id,
+            settlement_mode = EXCLUDED.settlement_mode,
             slug = EXCLUDED.slug,
             api_namespace = EXCLUDED.api_namespace,
             name = EXCLUDED.name,
@@ -2999,6 +3306,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           [
             service.id,
             service.providerAccountId,
+            service.settlementMode,
             service.slug,
             service.apiNamespace,
             service.name,
@@ -3084,14 +3392,15 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         await client.query(
           `
           INSERT INTO published_service_versions (
-            version_id, service_id, provider_account_id, slug, api_namespace, name, owner_name, tagline, about,
+            version_id, service_id, provider_account_id, settlement_mode, slug, api_namespace, name, owner_name, tagline, about,
             categories, route_ids, featured, prompt_intro, setup_instructions, website_url, contact_email,
             payout_wallet, status, submitted_review_id, published_at, created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, $14::jsonb, $15, $16,
-            $17, $18, $19, $20, $21, $22
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14, $15::jsonb, $16, $17,
+            $18, $19, $20, $21, $22, $23
           )
           ON CONFLICT (version_id) DO UPDATE SET
+            settlement_mode = EXCLUDED.settlement_mode,
             owner_name = EXCLUDED.owner_name,
             tagline = EXCLUDED.tagline,
             about = EXCLUDED.about,
@@ -3110,6 +3419,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
             publishedService.versionId,
             publishedService.serviceId,
             publishedService.providerAccountId,
+            publishedService.settlementMode,
             publishedService.slug,
             publishedService.apiNamespace,
             publishedService.name,
@@ -3138,18 +3448,19 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           `
           INSERT INTO published_endpoint_versions (
             endpoint_version_id, service_id, service_version_id, endpoint_draft_id, route_id, provider, operation,
-            version, mode, network, price, billing, title, description, payout, request_example, response_example, usage_notes,
+            version, settlement_mode, mode, network, price, billing, title, description, payout, request_example, response_example, usage_notes,
             request_schema_json, response_schema_json, executor_kind, upstream_base_url, upstream_path, upstream_auth_mode,
             upstream_auth_header_name, upstream_secret_ref, created_at, updated_at
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15::jsonb, $16::jsonb, $17::jsonb, $18,
-            $19::jsonb, $20::jsonb, $21, $22, $23, $24, $25, $26, $27, $28
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16::jsonb, $17::jsonb, $18::jsonb, $19,
+            $20::jsonb, $21::jsonb, $22, $23, $24, $25, $26, $27, $28, $29
           )
           ON CONFLICT (endpoint_version_id) DO UPDATE SET
             route_id = EXCLUDED.route_id,
             provider = EXCLUDED.provider,
             operation = EXCLUDED.operation,
             version = EXCLUDED.version,
+            settlement_mode = EXCLUDED.settlement_mode,
             mode = EXCLUDED.mode,
             network = EXCLUDED.network,
             price = EXCLUDED.price,
@@ -3179,6 +3490,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
             endpoint.provider,
             endpoint.operation,
             endpoint.version,
+            endpoint.settlementMode,
             endpoint.mode,
             endpoint.network,
             endpoint.price,
@@ -3747,6 +4059,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         AND response_status_code >= 200
         AND response_status_code < 400
         AND provider_payout_source_kind IS NOT NULL
+        AND COALESCE((payout_split->>'usesTreasurySettlement')::boolean, TRUE)
         AND COALESCE(payout_split->>'providerWallet', '') <> ''
         AND (payout_split->>'providerAmount')::numeric > 0
         AND NOT EXISTS (
@@ -3777,6 +4090,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         payout_split->>'providerAmount' AS amount
       FROM jobs
       WHERE status = 'completed'
+        AND COALESCE((payout_split->>'usesTreasurySettlement')::boolean, TRUE)
         AND COALESCE(payout_split->>'providerWallet', '') <> ''
         AND (payout_split->>'providerAmount')::numeric > 0
         AND NOT EXISTS (
@@ -3930,7 +4244,11 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         account = mapCreditAccountRow(existingAccountResult.rows[0]);
       }
 
-      if (BigInt(input.payoutSplit.providerAmount) > 0n && input.payoutSplit.providerWallet) {
+      if (
+        input.payoutSplit.usesTreasurySettlement
+        && BigInt(input.payoutSplit.providerAmount) > 0n
+        && input.payoutSplit.providerWallet
+      ) {
         await client.query(
           `
           INSERT INTO provider_payouts (
@@ -5058,13 +5376,14 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     await this.pool.query(
       `
       INSERT INTO provider_services (
-        id, provider_account_id, slug, api_namespace, name, tagline, about, categories,
+        id, provider_account_id, settlement_mode, slug, api_namespace, name, tagline, about, categories,
         prompt_intro, setup_instructions, website_url, payout_wallet, featured, status
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::jsonb, $9, $10::jsonb, $11, $12, $13, 'draft')
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11::jsonb, $12, $13, $14, 'draft')
       `,
       [
         id,
         account.id,
+        settlementModeForNewProviderService(),
         input.slug,
         input.apiNamespace,
         input.name,
@@ -5428,17 +5747,18 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       await client.query(
         `
         INSERT INTO published_service_versions (
-          version_id, service_id, provider_account_id, slug, api_namespace, name, owner_name, tagline, about,
+          version_id, service_id, provider_account_id, settlement_mode, slug, api_namespace, name, owner_name, tagline, about,
           categories, route_ids, featured, prompt_intro, setup_instructions, website_url, contact_email,
           payout_wallet, status, submitted_review_id
         ) VALUES (
-          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10::jsonb, $11::jsonb, $12, $13, $14::jsonb, $15, $16, $17, 'pending_review', $18
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11::jsonb, $12::jsonb, $13, $14, $15::jsonb, $16, $17, $18, 'pending_review', $19
         )
         `,
         [
           serviceVersionId,
           serviceId,
           detail.account.id,
+          detail.service.settlementMode,
           detail.service.slug,
           detail.service.apiNamespace,
           detail.service.name,
@@ -5462,12 +5782,12 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
           `
           INSERT INTO published_endpoint_versions (
             endpoint_version_id, service_id, service_version_id, endpoint_draft_id, route_id, provider, operation,
-            version, mode, network, price, billing, title, description, payout, request_example, response_example, usage_notes,
+            version, settlement_mode, mode, network, price, billing, title, description, payout, request_example, response_example, usage_notes,
             request_schema_json, response_schema_json, executor_kind, upstream_base_url, upstream_path,
             upstream_auth_mode, upstream_auth_header_name, upstream_secret_ref
           ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12::jsonb, $13, $14, $15::jsonb, $16::jsonb, $17::jsonb, $18,
-            $19::jsonb, $20::jsonb, $21, $22, $23, $24, $25, $26
+            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13::jsonb, $14, $15, $16::jsonb, $17::jsonb, $18::jsonb, $19,
+            $20::jsonb, $21::jsonb, $22, $23, $24, $25, $26, $27
           )
           `,
           [
@@ -5479,6 +5799,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
             detail.service.apiNamespace,
             endpoint.operation,
             versionTag,
+            detail.service.settlementMode,
             endpoint.mode,
             network.paymentNetwork,
             endpoint.price,
@@ -5550,6 +5871,39 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     }
   }
 
+  async getSubmittedProviderService(serviceId: string): Promise<ProviderServiceDetailRecord | null> {
+    const detail = await this.getAdminProviderService(serviceId);
+    const submittedVersionId = detail?.latestReview?.submittedVersionId ?? null;
+    if (!detail || !submittedVersionId) {
+      return null;
+    }
+
+    const [serviceResult, endpointsResult] = await Promise.all([
+      this.pool.query("SELECT * FROM published_service_versions WHERE version_id = $1", [submittedVersionId]),
+      this.pool.query(
+        `
+        SELECT * FROM published_endpoint_versions
+        WHERE service_version_id = $1
+        ORDER BY operation ASC
+        `,
+        [submittedVersionId]
+      )
+    ]);
+
+    if (!serviceResult.rowCount) {
+      return null;
+    }
+
+    return buildSubmittedProviderServiceDetail({
+      version: mapPublishedServiceVersionRow(serviceResult.rows[0]),
+      account: detail.account,
+      endpoints: endpointsResult.rows.map(mapPublishedEndpointVersionRow),
+      verification: detail.verification,
+      latestReview: detail.latestReview,
+      latestPublishedVersionId: detail.latestPublishedVersionId
+    });
+  }
+
   async requestProviderServiceChanges(
     serviceId: string,
     input: { reviewNotes: string; reviewerIdentity?: string | null }
@@ -5589,37 +5943,119 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
   async publishProviderService(
     serviceId: string,
-    input?: { reviewerIdentity?: string | null }
+    input?: { reviewerIdentity?: string | null; settlementMode?: SettlementMode | null; submittedVersionId?: string | null }
   ): Promise<ProviderServiceDetailRecord | null> {
     const service = await this.getAdminProviderService(serviceId);
-    if (!service?.latestReview) {
+    if (!service) {
       return null;
     }
+
+    const submittedVersionId = input?.submittedVersionId ?? service.latestReview?.submittedVersionId ?? null;
+    if (!submittedVersionId) {
+      return null;
+    }
+
+    const settlementMode = normalizeSettlementMode(input?.settlementMode ?? service.service.settlementMode, service.service.settlementMode);
 
     await this.pool.query(
       `
       UPDATE provider_reviews
-      SET status = 'published', reviewer_identity = COALESCE($2, reviewer_identity), updated_at = NOW()
-      WHERE id = $1
+      SET status = 'published', reviewer_identity = COALESCE($3, reviewer_identity), updated_at = NOW()
+      WHERE service_id = $1 AND submitted_version_id = $2
       `,
-      [service.latestReview.id, input?.reviewerIdentity ?? null]
+      [serviceId, submittedVersionId, input?.reviewerIdentity ?? null]
     );
     await this.pool.query(
       `
       UPDATE published_service_versions
-      SET status = 'published', published_at = NOW(), updated_at = NOW()
-      WHERE version_id = $1
+      SET status = 'published', settlement_mode = $3, published_at = NOW(), updated_at = NOW()
+      WHERE service_id = $1 AND version_id = $2
       `,
-      [service.latestReview.submittedVersionId]
+      [serviceId, submittedVersionId, settlementMode]
+    );
+    await this.pool.query(
+      `
+      UPDATE published_endpoint_versions
+      SET settlement_mode = $3, updated_at = NOW()
+      WHERE service_id = $1 AND service_version_id = $2
+      `,
+      [serviceId, submittedVersionId, settlementMode]
     );
     await this.pool.query(
       `
       UPDATE provider_services
-      SET status = 'published', latest_published_version_id = $2, updated_at = NOW()
+      SET status = 'published', settlement_mode = $2, latest_published_version_id = $3, updated_at = NOW()
       WHERE id = $1
       `,
-      [serviceId, service.latestReview.submittedVersionId]
+      [serviceId, settlementMode, submittedVersionId]
     );
+
+    return this.getProviderServiceDetailById(serviceId);
+  }
+
+  async updateProviderServiceSettlementMode(
+    serviceId: string,
+    input: {
+      settlementMode: SettlementMode;
+      reviewerIdentity?: string | null;
+      submittedVersionId?: string | null;
+      publishedVersionId?: string | null;
+    }
+  ): Promise<ProviderServiceDetailRecord | null> {
+    const service = await this.getAdminProviderService(serviceId);
+    if (!service) {
+      return null;
+    }
+
+    const settlementMode = normalizeSettlementMode(input.settlementMode, service.service.settlementMode);
+    const versionIds = Array.from(
+      new Set(
+        [
+          input.submittedVersionId ?? service.latestReview?.submittedVersionId ?? null,
+          input.publishedVersionId ?? service.latestPublishedVersionId ?? null
+        ].filter((value): value is string => Boolean(value))
+      )
+    );
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      await client.query(
+        `
+        UPDATE provider_services
+        SET settlement_mode = $2, updated_at = NOW()
+        WHERE id = $1
+        `,
+        [serviceId, settlementMode]
+      );
+
+      if (versionIds.length > 0) {
+        await client.query(
+          `
+          UPDATE published_service_versions
+          SET settlement_mode = $2, updated_at = NOW()
+          WHERE version_id = ANY($1::text[])
+          `,
+          [versionIds, settlementMode]
+        );
+
+        await client.query(
+          `
+          UPDATE published_endpoint_versions
+          SET settlement_mode = $2, updated_at = NOW()
+          WHERE service_version_id = ANY($1::text[])
+          `,
+          [versionIds, settlementMode]
+        );
+      }
+
+      await client.query("COMMIT");
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
 
     return this.getProviderServiceDetailById(serviceId);
   }
@@ -5916,7 +6352,7 @@ function mapIdempotencyRow(row: Record<string, unknown>): IdempotencyRecord {
     routeVersion: row.route_version as string,
     pendingRecoveryAction: (row.pending_recovery_action as IdempotencyRecord["pendingRecoveryAction"]) ?? "retry",
     quotedPrice: row.quoted_price as string,
-    payoutSplit: row.payout_split as IdempotencyRecord["payoutSplit"],
+    payoutSplit: normalizePersistedPayoutSplit(row.payout_split as IdempotencyRecord["payoutSplit"]),
     paymentPayload: row.payment_payload as string,
     facilitatorResponse: row.facilitator_response,
     responseKind: row.response_kind as "sync" | "job",
@@ -5952,7 +6388,7 @@ function mapJobRow(row: Record<string, unknown>): JobRecord {
     operation: row.operation as string,
     buyerWallet: row.buyer_wallet as string,
     quotedPrice: row.quoted_price as string,
-    payoutSplit: row.payout_split as JobRecord["payoutSplit"],
+    payoutSplit: normalizePersistedPayoutSplit(row.payout_split as JobRecord["payoutSplit"]),
     providerJobId: row.provider_job_id as string,
     requestBody: row.request_body,
     routeSnapshot: row.route_snapshot as MarketplaceRoute,
@@ -6044,6 +6480,7 @@ function mapProviderServiceRow(row: Record<string, unknown>): ProviderServiceRec
   return {
     id: row.id as string,
     providerAccountId: row.provider_account_id as string,
+    settlementMode: normalizeSettlementMode(row.settlement_mode as SettlementMode | null | undefined, "community_direct"),
     slug: row.slug as string,
     apiNamespace: row.api_namespace as string,
     name: row.name as string,
@@ -6122,6 +6559,7 @@ function mapPublishedServiceVersionRow(row: Record<string, unknown>): PublishedS
     versionId: row.version_id as string,
     serviceId: row.service_id as string,
     providerAccountId: row.provider_account_id as string,
+    settlementMode: normalizeSettlementMode(row.settlement_mode as SettlementMode | null | undefined),
     slug: row.slug as string,
     apiNamespace: row.api_namespace as string,
     name: row.name as string,
@@ -6155,6 +6593,7 @@ function mapPublishedEndpointVersionRow(row: Record<string, unknown>): Published
     provider: row.provider as string,
     operation: row.operation as string,
     version: row.version as string,
+    settlementMode: normalizeSettlementMode(row.settlement_mode as SettlementMode | null | undefined),
     mode: row.mode as PublishedEndpointVersionRecord["mode"],
     network: row.network as PublishedEndpointVersionRecord["network"],
     price: row.price as string,

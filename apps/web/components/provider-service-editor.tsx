@@ -15,9 +15,11 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import {
   createProviderEndpoint,
+  fetchProviderRuntimeKey,
   createProviderVerificationChallenge,
   deleteProviderEndpoint,
   fetchProviderService,
+  rotateProviderRuntimeKey,
   submitProviderService,
   updateProviderEndpoint,
   updateProviderService,
@@ -60,6 +62,8 @@ function ProviderServiceEditorInner({
   serviceId: string;
 }) {
   const [detail, setDetail] = React.useState<Awaited<ReturnType<typeof fetchProviderService>> | undefined>(undefined);
+  const [runtimeKey, setRuntimeKey] = React.useState<Awaited<ReturnType<typeof fetchProviderRuntimeKey>> | undefined>(undefined);
+  const [runtimeSecret, setRuntimeSecret] = React.useState<string | null>(null);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -69,7 +73,12 @@ function ProviderServiceEditorInner({
     startTransition(async () => {
       try {
         setError(null);
-        setDetail(await fetchProviderService(apiBaseUrl, accessToken, serviceId));
+        const [nextDetail, nextRuntimeKey] = await Promise.all([
+          fetchProviderService(apiBaseUrl, accessToken, serviceId),
+          fetchProviderRuntimeKey(apiBaseUrl, accessToken, serviceId)
+        ]);
+        setDetail(nextDetail);
+        setRuntimeKey(nextRuntimeKey);
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : "Failed to load service draft.");
       }
@@ -107,7 +116,12 @@ function ProviderServiceEditorInner({
   }
 
   async function refresh() {
-    setDetail(await fetchProviderService(apiBaseUrl, accessToken, serviceId));
+    const [nextDetail, nextRuntimeKey] = await Promise.all([
+      fetchProviderService(apiBaseUrl, accessToken, serviceId),
+      fetchProviderRuntimeKey(apiBaseUrl, accessToken, serviceId)
+    ]);
+    setDetail(nextDetail);
+    setRuntimeKey(nextRuntimeKey);
   }
 
   function onSaveService(event: React.FormEvent<HTMLFormElement>) {
@@ -202,6 +216,22 @@ function ProviderServiceEditorInner({
     });
   }
 
+  function onRotateRuntimeKey() {
+    setError(null);
+    setMessage(null);
+
+    startTransition(async () => {
+      try {
+        const nextKey = await rotateProviderRuntimeKey(apiBaseUrl, accessToken, serviceId);
+        setRuntimeKey(nextKey.runtimeKey);
+        setRuntimeSecret(nextKey.plaintextKey);
+        setMessage("Runtime key rotated. Copy the plaintext key now.");
+      } catch (nextError) {
+        setError(nextError instanceof Error ? nextError.message : "Runtime key rotation failed.");
+      }
+    });
+  }
+
   return (
     <div className="grid gap-6">
       <Card variant="frosted">
@@ -254,6 +284,41 @@ function ProviderServiceEditorInner({
               </Button>
             </div>
           </form>
+        </CardContent>
+      </Card>
+
+      <Card variant="frosted">
+        <CardHeader>
+          <CardTitle className="text-3xl">Settlement tier</CardTitle>
+          <CardDescription>
+            Current tier: {detail.service.settlementMode === "verified_escrow" ? "Verified" : "Community"}.
+            Providers cannot switch this themselves in v1.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4 text-sm text-muted-foreground">
+          <div className="rounded-card border border-border bg-background/70 p-5 dark:bg-background/20">
+            {detail.service.settlementMode === "verified_escrow"
+              ? "Verified services use marketplace escrow, marketplace refunds, and marketplace payout settlement."
+              : "Community services are paid directly, require a runtime key for signed buyer identity headers, and provider-owned refund handling."}
+          </div>
+          <div className="rounded-card border border-border bg-background/70 p-5 dark:bg-background/20 space-y-3">
+            <div className="font-medium text-foreground">Provider runtime key</div>
+            <div>{runtimeKey ? `Active key: ${runtimeKey.keyPrefix}` : "No runtime key created yet."}</div>
+            <div className="flex flex-wrap gap-3">
+              <Button type="button" variant="outline" onClick={onRotateRuntimeKey} disabled={pending}>
+                {runtimeKey ? "Rotate runtime key" : "Create runtime key"}
+              </Button>
+            </div>
+            {runtimeSecret ? (
+              <div className="flex items-center justify-between gap-3 rounded-card border border-border bg-background/80 p-4 dark:bg-background/30">
+                <div>
+                  <div className="text-xs text-muted-foreground">Plaintext runtime key</div>
+                  <div className="break-all font-mono text-sm text-foreground">{runtimeSecret}</div>
+                </div>
+                <CopyButton value={runtimeSecret} />
+              </div>
+            ) : null}
+          </div>
         </CardContent>
       </Card>
 

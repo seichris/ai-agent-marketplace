@@ -14,16 +14,20 @@ const verifyProviderService = vi.fn();
 const submitProviderService = vi.fn();
 const deleteProviderEndpoint = vi.fn();
 const updateProviderEndpoint = vi.fn();
+const fetchProviderRuntimeKey = vi.fn();
+const rotateProviderRuntimeKey = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   fetchProviderService: (...args: unknown[]) => fetchProviderService(...args),
+  fetchProviderRuntimeKey: (...args: unknown[]) => fetchProviderRuntimeKey(...args),
   updateProviderService: (...args: unknown[]) => updateProviderService(...args),
   createProviderEndpoint: (...args: unknown[]) => createProviderEndpoint(...args),
   createProviderVerificationChallenge: (...args: unknown[]) => createProviderVerificationChallenge(...args),
   verifyProviderService: (...args: unknown[]) => verifyProviderService(...args),
   submitProviderService: (...args: unknown[]) => submitProviderService(...args),
   deleteProviderEndpoint: (...args: unknown[]) => deleteProviderEndpoint(...args),
-  updateProviderEndpoint: (...args: unknown[]) => updateProviderEndpoint(...args)
+  updateProviderEndpoint: (...args: unknown[]) => updateProviderEndpoint(...args),
+  rotateProviderRuntimeKey: (...args: unknown[]) => rotateProviderRuntimeKey(...args)
 }));
 
 describe("ProviderServiceEditor", () => {
@@ -37,6 +41,9 @@ describe("ProviderServiceEditor", () => {
     submitProviderService.mockReset();
     deleteProviderEndpoint.mockReset();
     updateProviderEndpoint.mockReset();
+    fetchProviderRuntimeKey.mockReset();
+    rotateProviderRuntimeKey.mockReset();
+    fetchProviderRuntimeKey.mockResolvedValue(null);
 
     window.localStorage.setItem(
       "fast-marketplace-wallet-session",

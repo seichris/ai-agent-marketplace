@@ -15,6 +15,13 @@ import type {
 } from "@marketplace/shared";
 import { clearStoredWalletSession } from "@/lib/wallet-session";
 
+export interface ProviderRuntimeKeySummary {
+  id: string;
+  keyPrefix: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 function getApiBaseUrl(): string {
   return process.env.MARKETPLACE_API_BASE_URL ?? "http://localhost:3000";
 }
@@ -375,6 +382,34 @@ export async function verifyProviderService(
     apiBaseUrl,
     accessToken,
     path: `/provider/services/${serviceId}/verify`,
+    init: {
+      method: "POST"
+    }
+  });
+}
+
+export async function fetchProviderRuntimeKey(
+  apiBaseUrl: string,
+  accessToken: string,
+  serviceId: string
+): Promise<ProviderRuntimeKeySummary | null> {
+  const data = await fetchMarketplace<{ runtimeKey: ProviderRuntimeKeySummary | null }>({
+    apiBaseUrl,
+    accessToken,
+    path: `/provider/services/${serviceId}/runtime-key`
+  });
+  return data.runtimeKey;
+}
+
+export async function rotateProviderRuntimeKey(
+  apiBaseUrl: string,
+  accessToken: string,
+  serviceId: string
+): Promise<{ runtimeKey: ProviderRuntimeKeySummary; plaintextKey: string }> {
+  return fetchMarketplace<{ runtimeKey: ProviderRuntimeKeySummary; plaintextKey: string }>({
+    apiBaseUrl,
+    accessToken,
+    path: `/provider/services/${serviceId}/runtime-key`,
     init: {
       method: "POST"
     }

@@ -9,6 +9,7 @@ import {
   PAYMENT_SIGNATURE_HEADER
 } from "./constants.js";
 import { getDefaultMarketplaceNetworkConfig } from "./network.js";
+import { settlementModeDescription, settlementModeLabel } from "./settlement.js";
 import type { MarketplaceRoute, ServiceDefinition } from "./types.js";
 
 export function buildOpenApiDocument(input: {
@@ -94,6 +95,14 @@ export function buildOpenApiDocument(input: {
         summary: "Update service draft metadata."
       }
     },
+    "/provider/services/{id}/runtime-key": {
+      get: {
+        summary: "Get the current provider runtime key summary."
+      },
+      post: {
+        summary: "Create or rotate the provider runtime key."
+      }
+    },
     "/provider/services/{id}/endpoints": {
       post: {
         summary: "Create a provider endpoint draft."
@@ -150,6 +159,11 @@ export function buildOpenApiDocument(input: {
     "/internal/provider-services/{id}/publish": {
       post: {
         summary: "Publish the latest submitted provider service snapshot."
+      }
+    },
+    "/internal/provider-services/{id}/settlement-mode": {
+      patch: {
+        summary: "Change the settlement tier for a provider service."
       }
     },
     "/internal/provider-services/{id}/suspend": {
@@ -285,6 +299,8 @@ export function buildLlmsTxt(input: {
       `- ${service.name}`,
       `  owner: ${service.ownerName}`,
       `  slug: ${service.slug}`,
+      `  settlement: ${settlementModeLabel(service.settlementMode)}`,
+      `  guarantees: ${settlementModeDescription(service.settlementMode)}`,
       `  priceRange: ${summary.priceRange}`,
       `  endpointCount: ${routes.length}`,
       `  categories: ${service.categories.join(", ")}`
@@ -299,6 +315,7 @@ export function buildLlmsTxt(input: {
       `  routeId: ${route.routeId}`,
       `  mode: ${route.mode}`,
       `  network: ${route.network}`,
+      `  settlement: ${settlementModeLabel(route.settlementMode)}`,
       `  billing: ${route.billing.type}`,
       `  price: ${routePriceLabel(route)}`,
       `  description: ${route.description}`
@@ -348,6 +365,9 @@ export function buildMarketplaceCatalog(input: {
       slug: service.slug,
       name: service.name,
       ownerName: service.ownerName,
+      settlementMode: service.settlementMode,
+      settlementLabel: settlementModeLabel(service.settlementMode),
+      settlementDescription: settlementModeDescription(service.settlementMode),
       categories: service.categories,
       routeIds: service.routeIds
     })),
@@ -358,6 +378,7 @@ export function buildMarketplaceCatalog(input: {
       method: "POST",
       path: `/api/${route.provider}/${route.operation}`,
       mode: route.mode,
+      settlementMode: route.settlementMode,
       network: route.network,
       billingType: route.billing.type,
       price: routePriceLabel(route),

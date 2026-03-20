@@ -41,6 +41,29 @@ async function createTestWallet() {
   };
 }
 
+function buildEscrowSplit(input: {
+  providerAccountId: string;
+  providerWallet: string | null;
+  marketplaceAmount: string;
+  providerAmount: string;
+  marketplaceBps: number;
+  providerBps: number;
+}) {
+  return {
+    currency: "fastUSDC" as const,
+    settlementMode: "verified_escrow" as const,
+    paymentDestinationWallet: "fast1market",
+    usesTreasurySettlement: true,
+    marketplaceWallet: "fast1market",
+    marketplaceBps: input.marketplaceBps,
+    marketplaceAmount: input.marketplaceAmount,
+    providerAccountId: input.providerAccountId,
+    providerWallet: input.providerWallet,
+    providerBps: input.providerBps,
+    providerAmount: input.providerAmount
+  };
+}
+
 describe("shared marketplace helpers", () => {
   it("normalizes payment headers across new and legacy names", () => {
     expect(
@@ -132,7 +155,8 @@ describe("shared marketplace helpers", () => {
   it("freezes payout split amounts from the quoted price", () => {
     const split = buildPayoutSplit({
       route: marketplaceRoutes[0],
-      marketplaceWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
+      treasuryWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
+      paymentDestinationWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
       quotedPrice: "50000"
     });
 
@@ -264,16 +288,14 @@ describe("shared marketplace helpers", () => {
       routeId: "mock.quick-insight.v1",
       routeVersion: "v1",
       quotedPrice: "50000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1market",
-        marketplaceBps: 6000,
-        marketplaceAmount: "30000",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "mock",
         providerWallet: null,
+        marketplaceBps: 6000,
+        marketplaceAmount: "30000",
         providerBps: 4000,
         providerAmount: "20000"
-      },
+      }),
       paymentPayload: "payload",
       facilitatorResponse: { isValid: true },
       statusCode: 200,
@@ -286,16 +308,14 @@ describe("shared marketplace helpers", () => {
       buyerWallet: "fast1buyer00000000000000000000000000000000000000000000000000000000",
       route: marketplaceRoutes[1],
       quotedPrice: "150000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1market",
-        marketplaceBps: 7334,
-        marketplaceAmount: "110000",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "mock",
         providerWallet: null,
+        marketplaceBps: 7334,
+        marketplaceAmount: "110000",
         providerBps: 2666,
         providerAmount: "40000"
-      },
+      }),
       paymentPayload: "payload",
       facilitatorResponse: { isValid: true },
       jobToken: "job_catalog_1",
@@ -322,16 +342,14 @@ describe("shared marketplace helpers", () => {
       routeId: "mock.quick-insight.v1",
       routeVersion: "v1",
       quotedPrice: "50000",
-      payoutSplit: {
-        currency: "fastUSDC",
-        marketplaceWallet: "fast1market",
-        marketplaceBps: 6000,
-        marketplaceAmount: "30000",
+      payoutSplit: buildEscrowSplit({
         providerAccountId: "provider_marketplace",
         providerWallet: null,
+        marketplaceBps: 6000,
+        marketplaceAmount: "30000",
         providerBps: 4000,
         providerAmount: "20000"
-      },
+      }),
       paymentPayload: "payload",
       facilitatorResponse: { isValid: true },
       statusCode: 502,

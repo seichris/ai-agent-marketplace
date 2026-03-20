@@ -15,6 +15,7 @@ export * from "./refund.js";
 export * from "./routes.js";
 export * from "./seed.js";
 export * from "./secrets.js";
+export * from "./settlement.js";
 export * from "./services.js";
 export * from "./store.js";
 export * from "./types.js";

@@ -30,7 +30,16 @@ Marketplace routes use one of three billing modes:
 - `topup_x402_variable`: buyer supplies an amount in the request body, pays that exact amount with x402, and receives marketplace-managed service credit
 - `prepaid_credit`: buyer first funds service credit, then invokes the route with wallet-session bearer auth instead of paying x402 on every call
 
-Provider payouts are treasury-settled by the worker. Successful route charges and top-ups create provider payout records, and the worker batches and sends those payouts on Fast.
+## Settlement Tiers
+
+Services publish under one of two settlement tiers:
+
+- `community_direct`: buyer pays the provider wallet directly through x402, provider-owned refunds and reimbursements, no marketplace treasury custody
+- `verified_escrow`: buyer pays marketplace treasury, marketplace can refund failures, reconcile stale payments, support prepaid credit, and settle provider payouts later
+
+New provider-created drafts default to `community_direct`. Marketplace-operated seeded services remain `verified_escrow`, and only `verified_escrow` services can publish `topup_x402_variable` or `prepaid_credit` routes.
+
+For `verified_escrow`, successful route charges and top-ups create provider payout records, and the worker batches and sends those payouts on Fast. `community_direct` does not create treasury payout records because the buyer already paid the provider wallet directly.
 
 ## Quick Start
 
@@ -63,7 +72,7 @@ export MARKETPLACE_TREASURY_PRIVATE_KEY=<fast-ed25519-private-key-hex>
 export FAST_RPC_URL=https://api.fast.xyz/proxy
 ```
 
-`MARKETPLACE_SECRETS_KEY` is required. It is used for provider runtime keys, encrypted upstream secrets, and signed marketplace identity headers for prepaid-credit providers.
+`MARKETPLACE_SECRETS_KEY` is required. It is used for provider runtime keys, encrypted upstream secrets, and signed marketplace identity headers for Community/direct and prepaid-credit providers.
 
 Optional facilitator variables:
 
@@ -214,10 +223,15 @@ The web app supports wallet login with the Fast browser extension through `@fast
 
 ## Provider Credit Runtime
 
-Provider-authored prepaid-credit services use marketplace-managed credit and provider runtime keys.
+Provider runtime keys are used in two cases:
+
+- `community_direct` HTTP routes: the marketplace forwards signed buyer identity headers so the provider can trust the requester wallet and `X-MARKETPLACE-REQUEST-ID`
+- `verified_escrow` prepaid-credit routes: the provider uses the runtime credit APIs to reserve, capture, and release marketplace-held credit
+
+Provider runtime key operations:
 
 - rotate a runtime key from the provider service dashboard or `POST /provider/services/:id/runtime-key`
-- marketplace forwards signed buyer identity headers to the provider upstream for prepaid-credit execution
+- marketplace forwards signed buyer identity headers to the provider upstream when the settlement flow requires them
 - provider backends reserve, capture, and release buyer credit through:
   - `POST /provider/runtime/credits/reserve`
   - `POST /provider/runtime/credits/:reservationId/capture`
@@ -241,7 +255,3 @@ Provider-authored prepaid-credit services use marketplace-managed credit and pro
 - `npm run start:worker`: run the built worker bundle
 - `npm run start:web`: run the Next.js frontend
 - `npm run cli -- ...`: run the buyer CLI
-
-## License
-
-MIT

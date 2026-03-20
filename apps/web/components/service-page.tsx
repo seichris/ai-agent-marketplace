@@ -39,6 +39,9 @@ export function ServicePage({
               <div className="space-y-5">
                 <div className="flex flex-wrap items-center gap-3">
                   <Badge variant="outline">{service.summary.ownerName}</Badge>
+                  <Badge variant={service.summary.settlementMode === "verified_escrow" ? "default" : "secondary"}>
+                    {service.summary.settlementLabel}
+                  </Badge>
                   <span className="text-sm tracking-headline text-muted-foreground">
                     {service.summary.priceRange} per call
                   </span>
@@ -46,6 +49,7 @@ export function ServicePage({
                 <div className="space-y-4">
                   <h1 className="section-title">{service.summary.name}</h1>
                   <p className="body-copy">{service.summary.tagline}</p>
+                  <p className="text-sm leading-7 text-muted-foreground">{service.summary.settlementDescription}</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {service.summary.categories.map((category) => (

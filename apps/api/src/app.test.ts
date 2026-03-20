@@ -874,6 +874,13 @@ describe("marketplace api", () => {
     const serviceId = createdService.body.service.id as string;
     const providerAccountId = createdService.body.account.id as string;
 
+    const runtimeKeyResponse = await request(app)
+      .post(`/provider/services/${serviceId}/runtime-key`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({});
+
+    expect(runtimeKeyResponse.status).toBe(201);
+
     const createdEndpoint = await request(app)
       .post(`/provider/services/${serviceId}/endpoints`)
       .set("Authorization", `Bearer ${providerToken}`)
@@ -961,7 +968,8 @@ describe("marketplace api", () => {
       .post(`/internal/provider-services/${serviceId}/publish`)
       .set("Authorization", "Bearer test-admin-token")
       .send({
-        reviewerIdentity: "ops@test"
+        reviewerIdentity: "ops@test",
+        settlementMode: "community_direct"
       });
 
     expect(published.status).toBe(200);
@@ -985,6 +993,7 @@ describe("marketplace api", () => {
       .send({ symbol: "FAST" });
 
     expect(unpaid.status).toBe(402);
+    expect(unpaid.body.accepts[0].payTo).toBe(providerWallet.address);
 
     const paid = await request(app)
       .post("/api/signals/quote")
@@ -997,15 +1006,170 @@ describe("marketplace api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "https://provider.example.com/api/quote",
       expect.objectContaining({
-        method: "POST"
+        method: "POST",
+        headers: expect.objectContaining({
+          "X-MARKETPLACE-BUYER-WALLET": buyer.address,
+          "X-MARKETPLACE-SERVICE-ID": serviceId,
+          "X-MARKETPLACE-PAYMENT-ID": "payment_provider_sync_1"
+        })
       })
     );
 
     const record = await store.getIdempotencyByPaymentId("payment_provider_sync_1");
     expect(record?.routeId).toBe("signals.quote.v1");
     expect(record?.payoutSplit.providerAccountId).toBe(providerAccountId);
+    expect(record?.payoutSplit.settlementMode).toBe("community_direct");
+    expect(record?.payoutSplit.paymentDestinationWallet).toBe(providerWallet.address);
+    expect(record?.payoutSplit.usesTreasurySettlement).toBe(false);
     expect(record?.payoutSplit.providerAmount).toBe("250000");
     expect(record?.payoutSplit.marketplaceAmount).toBe("0");
+    expect(await store.listPendingProviderPayouts(10)).toHaveLength(0);
+  });
+
+  it("publishes the submitted snapshot even if later draft edits are community-incompatible", async () => {
+    const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
+    const { app } = await createTestApp();
+    const providerToken = await createSiteSession(app, providerWallet);
+
+    const profile = await request(app)
+      .post("/provider/me")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        displayName: "Signal Labs",
+        websiteUrl: "https://provider.example.com"
+      });
+
+    expect(profile.status).toBe(201);
+
+    const createdService = await request(app)
+      .post("/provider/services")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        slug: "signal-labs-snapshot",
+        apiNamespace: "signals-snapshot",
+        name: "Signal Snapshot",
+        tagline: "Validated against the submitted snapshot.",
+        about: "A provider-owned pricing API used to verify publish validation matches the submitted version.",
+        categories: ["analytics"],
+        promptIntro: "Use this API to fetch a fixed-price market signal.",
+        setupInstructions: ["Create a provider account.", "Verify the provider domain before submitting."],
+        websiteUrl: "https://provider.example.com",
+        payoutWallet: providerWallet.address
+      });
+
+    expect(createdService.status).toBe(201);
+    const serviceId = createdService.body.service.id as string;
+
+    const runtimeKey = await request(app)
+      .post(`/provider/services/${serviceId}/runtime-key`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(runtimeKey.status).toBe(201);
+
+    const fixedEndpoint = await request(app)
+      .post(`/provider/services/${serviceId}/endpoints`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        operation: "quote",
+        title: "Get Quote",
+        description: "Returns the latest signal quote.",
+        billingType: "fixed_x402",
+        price: "$0.25",
+        mode: "sync",
+        requestSchemaJson: {
+          type: "object",
+          properties: {
+            symbol: { type: "string" }
+          },
+          required: ["symbol"],
+          additionalProperties: false
+        },
+        responseSchemaJson: {
+          type: "object",
+          properties: {
+            symbol: { type: "string" },
+            price: { type: "number" }
+          },
+          required: ["symbol", "price"],
+          additionalProperties: false
+        },
+        requestExample: { symbol: "FAST" },
+        responseExample: { symbol: "FAST", price: 42.5 },
+        upstreamBaseUrl: "https://provider.example.com",
+        upstreamPath: "/api/quote",
+        upstreamAuthMode: "none"
+      });
+    expect(fixedEndpoint.status).toBe(201);
+
+    const verificationChallenge = await request(app)
+      .post(`/provider/services/${serviceId}/verification-challenge`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(verificationChallenge.status).toBe(200);
+
+    vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      if (String(input) === verificationChallenge.body.expectedUrl) {
+        return new Response(verificationChallenge.body.token, { status: 200 });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    const verified = await request(app)
+      .post(`/provider/services/${serviceId}/verify`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(verified.status).toBe(200);
+
+    const submitted = await request(app)
+      .post(`/provider/services/${serviceId}/submit`)
+      .set("Authorization", `Bearer ${providerToken}`);
+    expect(submitted.status).toBe(202);
+
+    const laterDraftEndpoint = await request(app)
+      .post(`/provider/services/${serviceId}/endpoints`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        operation: "topup",
+        title: "Top Up",
+        description: "Funds marketplace-managed balance for later spending.",
+        billingType: "topup_x402_variable",
+        minAmount: "10",
+        maxAmount: "100",
+        mode: "sync",
+        requestSchemaJson: {
+          type: "object",
+          properties: {
+            amount: { type: "string" }
+          },
+          required: ["amount"],
+          additionalProperties: false
+        },
+        responseSchemaJson: {
+          type: "object",
+          properties: {
+            ok: { type: "boolean" }
+          },
+          required: ["ok"],
+          additionalProperties: false
+        },
+        requestExample: { amount: "25" },
+        responseExample: { ok: true }
+      });
+    expect(laterDraftEndpoint.status).toBe(201);
+
+    const published = await request(app)
+      .post(`/internal/provider-services/${serviceId}/publish`)
+      .set("Authorization", "Bearer test-admin-token")
+      .send({
+        reviewerIdentity: "ops@test",
+        settlementMode: "community_direct"
+      });
+
+    expect(published.status).toBe(200);
+    expect(published.body.endpoints).toHaveLength(2);
+
+    const publicDetail = await request(app).get("/catalog/services/signal-labs-snapshot");
+    expect(publicDetail.status).toBe(200);
+    expect(publicDetail.body.endpoints).toHaveLength(1);
+    expect(publicDetail.body.endpoints[0].proxyUrl).toContain("/api/signals-snapshot/quote");
   });
 
   it("does not re-execute stale pending self-serve HTTP charges and auto-refunds them in the worker", async () => {
@@ -1133,7 +1297,8 @@ describe("marketplace api", () => {
       .post(`/internal/provider-services/${serviceId}/publish`)
       .set("Authorization", "Bearer test-admin-token")
       .send({
-        reviewerIdentity: "ops@test"
+        reviewerIdentity: "ops@test",
+        settlementMode: "verified_escrow"
       });
 
     const first = await request(app)
@@ -1389,7 +1554,8 @@ describe("marketplace api", () => {
       .post(`/internal/provider-services/${serviceId}/publish`)
       .set("Authorization", "Bearer test-admin-token")
       .send({
-        reviewerIdentity: "ops@test"
+        reviewerIdentity: "ops@test",
+        settlementMode: "verified_escrow"
       });
     expect(published.status).toBe(200);
 
@@ -1663,7 +1829,8 @@ describe("marketplace api", () => {
       .post(`/internal/provider-services/${serviceId}/publish`)
       .set("Authorization", "Bearer test-admin-token")
       .send({
-        reviewerIdentity: "ops@test"
+        reviewerIdentity: "ops@test",
+        settlementMode: "verified_escrow"
       });
 
     const failed = await request(app)

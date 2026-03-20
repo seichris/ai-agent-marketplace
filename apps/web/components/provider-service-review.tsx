@@ -6,7 +6,7 @@ import type { MarketplaceDeploymentNetwork } from "@marketplace/shared";
 import { ProviderSessionGate } from "@/components/provider-session-gate";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { fetchProviderService, submitProviderService } from "@/lib/api";
+import { fetchProviderRuntimeKey, fetchProviderService, submitProviderService } from "@/lib/api";
 
 export function ProviderServiceReview({
   apiBaseUrl,
@@ -40,6 +40,7 @@ function ProviderServiceReviewInner({
   serviceId: string;
 }) {
   const [detail, setDetail] = React.useState<Awaited<ReturnType<typeof fetchProviderService>> | undefined>(undefined);
+  const [runtimeKey, setRuntimeKey] = React.useState<Awaited<ReturnType<typeof fetchProviderRuntimeKey>> | undefined>(undefined);
   const [pending, startTransition] = React.useTransition();
   const [message, setMessage] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
@@ -48,7 +49,12 @@ function ProviderServiceReviewInner({
     startTransition(async () => {
       try {
         setError(null);
-        setDetail(await fetchProviderService(apiBaseUrl, accessToken, serviceId));
+        const [nextDetail, nextRuntimeKey] = await Promise.all([
+          fetchProviderService(apiBaseUrl, accessToken, serviceId),
+          fetchProviderRuntimeKey(apiBaseUrl, accessToken, serviceId)
+        ]);
+        setDetail(nextDetail);
+        setRuntimeKey(nextRuntimeKey);
       } catch (nextError) {
         setError(nextError instanceof Error ? nextError.message : "Failed to load review state.");
       }
@@ -84,10 +90,23 @@ function ProviderServiceReviewInner({
   }
 
   const checklist = [
+    {
+      label: `Settlement tier is ${detail.service.settlementMode === "verified_escrow" ? "Verified" : "Community"}`,
+      ok: true
+    },
     { label: "Website URL is set", ok: Boolean(detail.service.websiteUrl) },
     { label: "Payout wallet is set", ok: Boolean(detail.service.payoutWallet) },
     { label: "At least one endpoint exists", ok: detail.endpoints.length > 0 },
-    { label: "Website verification succeeded", ok: detail.verification?.status === "verified" }
+    { label: "Website verification succeeded", ok: detail.verification?.status === "verified" },
+    {
+      label: "Runtime key is ready for Community or prepaid flows",
+      ok:
+        Boolean(runtimeKey)
+        || (
+          detail.service.settlementMode === "verified_escrow"
+          && !detail.endpoints.some((endpoint) => endpoint.billing.type === "prepaid_credit")
+        )
+    }
   ];
 
   function onSubmit() {
@@ -110,7 +129,7 @@ function ProviderServiceReviewInner({
       <Card variant="frosted">
         <CardHeader>
           <CardTitle className="text-3xl">{detail.service.name}</CardTitle>
-          <CardDescription>{detail.service.status}</CardDescription>
+          <CardDescription>{detail.service.status} · {detail.service.settlementMode === "verified_escrow" ? "Verified" : "Community"}</CardDescription>
         </CardHeader>
         <CardContent className="grid gap-4 text-sm">
           <div className="rounded-card border border-border bg-background/70 p-5 dark:bg-background/20">

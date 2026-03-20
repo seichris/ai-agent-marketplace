@@ -90,6 +90,9 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
                   <CardHeader>
                     <div className="flex flex-wrap items-center gap-2">
                       <Badge variant="outline">{service.ownerName}</Badge>
+                      <Badge variant={service.settlementMode === "verified_escrow" ? "default" : "secondary"}>
+                        {service.settlementLabel}
+                      </Badge>
                       <span className="text-sm tracking-headline text-muted-foreground">{service.priceRange}</span>
                     </div>
                     <div className="space-y-3">
@@ -105,6 +108,8 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
                         </Badge>
                       ))}
                     </div>
+
+                    <p className="text-sm leading-7 text-muted-foreground">{service.settlementDescription}</p>
 
                     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
                       <Metric label="Calls" value={String(service.totalCalls)} compact />

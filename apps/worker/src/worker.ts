@@ -62,6 +62,10 @@ export async function runMarketplaceWorkerCycle(options: MarketplaceWorkerOption
     }
 
     await options.store.failJob(job.jobToken, pollResult.error);
+    if (!job.payoutSplit.usesTreasurySettlement) {
+      continue;
+    }
+
     const refund = await options.store.createRefund({
       jobToken: job.jobToken,
       paymentId: job.paymentId,

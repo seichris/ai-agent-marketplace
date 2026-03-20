@@ -18,6 +18,7 @@ export type ProviderServiceStatus =
   | "archived";
 export type ProviderVerificationStatus = "pending" | "verified" | "failed";
 export type ProviderReviewStatus = "pending_review" | "changes_requested" | "published" | "suspended";
+export type SettlementMode = "community_direct" | "verified_escrow";
 
 export interface RoutePayoutConfig {
   providerAccountId: string;
@@ -27,6 +28,9 @@ export interface RoutePayoutConfig {
 
 export interface PersistedPayoutSplit {
   currency: MarketplaceTokenSymbol;
+  settlementMode: SettlementMode;
+  paymentDestinationWallet: string;
+  usesTreasurySettlement: boolean;
   marketplaceWallet: string;
   marketplaceBps: number;
   marketplaceAmount: string;
@@ -60,6 +64,7 @@ export interface MarketplaceRoute {
   provider: string;
   operation: string;
   version: string;
+  settlementMode: SettlementMode;
   mode: RouteMode;
   network: MarketplacePaymentNetwork;
   price: string;
@@ -83,6 +88,7 @@ export interface MarketplaceRoute {
 export interface ServiceDefinition {
   serviceId: string;
   providerAccountId: string;
+  settlementMode: SettlementMode;
   slug: string;
   apiNamespace: string;
   name: string;
@@ -135,6 +141,9 @@ export interface ServiceSummary {
   ownerName: string;
   tagline: string;
   categories: string[];
+  settlementMode: SettlementMode;
+  settlementLabel: string;
+  settlementDescription: string;
   priceRange: string;
   settlementToken: MarketplaceTokenSymbol;
   endpointCount: number;
@@ -245,6 +254,7 @@ export interface ProviderSecretRecord {
 export interface ProviderServiceRecord {
   id: string;
   providerAccountId: string;
+  settlementMode: SettlementMode;
   slug: string;
   apiNamespace: string;
   name: string;
@@ -866,13 +876,23 @@ export interface MarketplaceStore {
   submitProviderService(serviceId: string, wallet: string): Promise<ProviderServiceDetailRecord | null>;
   listAdminProviderServices(status?: ProviderServiceStatus): Promise<ProviderServiceDetailRecord[]>;
   getAdminProviderService(serviceId: string): Promise<ProviderServiceDetailRecord | null>;
+  getSubmittedProviderService(serviceId: string): Promise<ProviderServiceDetailRecord | null>;
   requestProviderServiceChanges(
     serviceId: string,
     input: { reviewNotes: string; reviewerIdentity?: string | null }
   ): Promise<ProviderServiceDetailRecord | null>;
   publishProviderService(
     serviceId: string,
-    input?: { reviewerIdentity?: string | null }
+    input?: { reviewerIdentity?: string | null; settlementMode?: SettlementMode | null; submittedVersionId?: string | null }
+  ): Promise<ProviderServiceDetailRecord | null>;
+  updateProviderServiceSettlementMode(
+    serviceId: string,
+    input: {
+      settlementMode: SettlementMode;
+      reviewerIdentity?: string | null;
+      submittedVersionId?: string | null;
+      publishedVersionId?: string | null;
+    }
   ): Promise<ProviderServiceDetailRecord | null>;
   suspendProviderService(
     serviceId: string,

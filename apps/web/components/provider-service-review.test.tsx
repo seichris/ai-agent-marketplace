@@ -7,10 +7,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { ProviderServiceReview } from "./provider-service-review";
 
 const fetchProviderService = vi.fn();
+const fetchProviderRuntimeKey = vi.fn();
 const submitProviderService = vi.fn();
 
 vi.mock("@/lib/api", () => ({
   fetchProviderService: (...args: unknown[]) => fetchProviderService(...args),
+  fetchProviderRuntimeKey: (...args: unknown[]) => fetchProviderRuntimeKey(...args),
   submitProviderService: (...args: unknown[]) => submitProviderService(...args)
 }));
 
@@ -18,7 +20,9 @@ describe("ProviderServiceReview", () => {
   beforeEach(() => {
     window.localStorage.clear();
     fetchProviderService.mockReset();
+    fetchProviderRuntimeKey.mockReset();
     submitProviderService.mockReset();
+    fetchProviderRuntimeKey.mockResolvedValue(null);
 
     window.localStorage.setItem(
       "fast-marketplace-wallet-session",
