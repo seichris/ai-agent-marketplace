@@ -203,6 +203,7 @@ function extractResponsePayload(root: Record<string, unknown>, operation: Record
     };
   }
 
+  const hasDefaultResponse = Object.keys(responses).some((status) => status.toLowerCase() === "default");
   for (const [status, responseValue] of sortResponseEntries(responses)) {
     if (!isSuccessfulResponse(status)) {
       continue;
@@ -239,7 +240,11 @@ function extractResponsePayload(root: Record<string, unknown>, operation: Record
   return {
     schema: structuredClone(DEFAULT_RESPONSE_SCHEMA),
     example: {},
-    warnings: ["No success response schema was declared. Review the imported response schema manually."]
+    warnings: [
+      hasDefaultResponse
+        ? "No explicit 2xx success response schema was declared. The OpenAPI default response was ignored because it is usually an error shape."
+        : "No success response schema was declared. Review the imported response schema manually."
+    ]
   };
 }
 
@@ -274,55 +279,109 @@ function inferUpstreamAuthMode(
     };
   }
 
-  if (securityValue.length > 1) {
-    warnings.push("Multiple security requirements were declared. Imported the first supported scheme.");
-  }
-
   const securitySchemes =
     readOptionalObject(readOptionalObject(root, "components"), "securitySchemes") ?? {};
+  const supportedCandidates: Array<{ mode: UpstreamAuthMode; headerName: string | null }> = [];
+  let allowsAnonymous = false;
+  let sawUnsupported = false;
 
   for (const requirement of securityValue) {
     if (!isRecord(requirement)) {
+      sawUnsupported = true;
       continue;
     }
 
     const schemeNames = Object.keys(requirement);
+    if (schemeNames.length === 0) {
+      allowsAnonymous = true;
+      continue;
+    }
+
     if (schemeNames.length !== 1) {
+      sawUnsupported = true;
       continue;
     }
 
     const schemeName = schemeNames[0] ?? "";
     const schemeValue = securitySchemes[schemeName];
     if (!schemeValue) {
+      sawUnsupported = true;
       continue;
     }
 
     const scheme = expectObject(resolveOpenApiNode(root, schemeValue), `OpenAPI security scheme ${schemeName}`);
     const type = readOptionalString(scheme, "type");
     if (type === "http" && readOptionalString(scheme, "scheme")?.toLowerCase() === "bearer") {
-      return {
+      supportedCandidates.push({
         mode: "bearer",
-        headerName: null,
-        warnings
-      };
+        headerName: null
+      });
+      continue;
     }
 
     if (type === "apiKey" && readOptionalString(scheme, "in") === "header") {
       const headerName = readOptionalString(scheme, "name");
       if (headerName) {
-        return {
+        supportedCandidates.push({
           mode: "header",
-          headerName,
-          warnings
-        };
+          headerName
+        });
+        continue;
       }
     }
+
+    sawUnsupported = true;
   }
 
-  warnings.push("Could not infer a supported upstream auth scheme. Review auth settings manually.");
+  if (allowsAnonymous) {
+    warnings.push("Security requirements allow unauthenticated access. Imported auth settings as none.");
+    return {
+      mode: "none",
+      headerName: null,
+      warnings
+    };
+  }
+
+  if (supportedCandidates.length === 0) {
+    warnings.push("Could not infer a supported upstream auth scheme. Review auth settings manually.");
+    return {
+      mode: "none",
+      headerName: null,
+      warnings
+    };
+  }
+
+  const uniqueCandidates = new Map<string, { mode: UpstreamAuthMode; headerName: string | null }>();
+  for (const candidate of supportedCandidates) {
+    uniqueCandidates.set(`${candidate.mode}:${candidate.headerName ?? ""}`, candidate);
+  }
+
+  if (uniqueCandidates.size > 1) {
+    warnings.push("Multiple alternative auth schemes were declared. Review auth settings manually.");
+    return {
+      mode: "none",
+      headerName: null,
+      warnings
+    };
+  }
+
+  if (sawUnsupported) {
+    warnings.push("Some security requirements could not be mapped automatically. Review auth settings manually.");
+  }
+
+  const resolved = uniqueCandidates.values().next().value;
+  if (!resolved) {
+    warnings.push("Could not infer a supported upstream auth scheme. Review auth settings manually.");
+    return {
+      mode: "none",
+      headerName: null,
+      warnings
+    };
+  }
+
   return {
-    mode: "none",
-    headerName: null,
+    mode: resolved.mode,
+    headerName: resolved.headerName,
     warnings
   };
 }
@@ -392,15 +451,11 @@ function responseStatusRank(status: string): number {
     return 299;
   }
 
-  if (status.toLowerCase() === "default") {
-    return 400;
-  }
-
   return 500;
 }
 
 function isSuccessfulResponse(status: string): boolean {
-  return /^2\d\d$/.test(status) || /^2xx$/i.test(status) || status.toLowerCase() === "default";
+  return /^2\d\d$/.test(status) || /^2xx$/i.test(status);
 }
 
 function pickJsonMediaType(

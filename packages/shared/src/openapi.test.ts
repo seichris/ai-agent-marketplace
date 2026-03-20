@@ -123,4 +123,134 @@ describe("parseOpenApiImportDocument", () => {
     });
     expect(endpoint.warnings).toContain("Add the upstream secret before creating this draft.");
   });
+
+  it("ignores default responses when no explicit 2xx success schema exists", () => {
+    const preview = parseOpenApiImportDocument({
+      documentUrl: "https://provider.example.com/openapi.json",
+      document: {
+        openapi: "3.0.3",
+        paths: {
+          "/search": {
+            post: {
+              responses: {
+                default: {
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "object",
+                        properties: {
+                          error: {
+                            type: "string"
+                          }
+                        },
+                        required: ["error"],
+                        additionalProperties: false
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const endpoint = preview.endpoints[0];
+    expect(endpoint.responseSchemaJson).toEqual({
+      type: "object",
+      additionalProperties: true
+    });
+    expect(endpoint.responseExample).toEqual({});
+    expect(endpoint.warnings).toContain(
+      "No explicit 2xx success response schema was declared. The OpenAPI default response was ignored because it is usually an error shape."
+    );
+  });
+
+  it("imports auth as none when unauthenticated access is explicitly allowed", () => {
+    const preview = parseOpenApiImportDocument({
+      documentUrl: "https://provider.example.com/openapi.json",
+      document: {
+        openapi: "3.0.3",
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: "http",
+              scheme: "bearer"
+            }
+          }
+        },
+        paths: {
+          "/search": {
+            post: {
+              security: [{ bearerAuth: [] }, {}],
+              responses: {
+                "200": {
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const endpoint = preview.endpoints[0];
+    expect(endpoint.upstreamAuthMode).toBe("none");
+    expect(endpoint.upstreamAuthHeaderName).toBeNull();
+    expect(endpoint.warnings).toContain(
+      "Security requirements allow unauthenticated access. Imported auth settings as none."
+    );
+    expect(endpoint.warnings).not.toContain("Add the upstream secret before creating this draft.");
+  });
+
+  it("does not guess between multiple alternative auth schemes", () => {
+    const preview = parseOpenApiImportDocument({
+      documentUrl: "https://provider.example.com/openapi.json",
+      document: {
+        openapi: "3.0.3",
+        components: {
+          securitySchemes: {
+            bearerAuth: {
+              type: "http",
+              scheme: "bearer"
+            },
+            apiKeyAuth: {
+              type: "apiKey",
+              in: "header",
+              name: "X-API-Key"
+            }
+          }
+        },
+        paths: {
+          "/search": {
+            post: {
+              security: [{ bearerAuth: [] }, { apiKeyAuth: [] }],
+              responses: {
+                "200": {
+                  content: {
+                    "application/json": {
+                      schema: {
+                        type: "object"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    });
+
+    const endpoint = preview.endpoints[0];
+    expect(endpoint.upstreamAuthMode).toBe("none");
+    expect(endpoint.warnings).toContain("Multiple alternative auth schemes were declared. Review auth settings manually.");
+  });
 });
