@@ -9,7 +9,7 @@ if (!tavilyApiKey) {
 
 const app = createTavilyServiceApp({
   tavilyApiKey,
-  upstreamUrl: process.env.TAVILY_UPSTREAM_URL,
+  tavilyApiBaseUrl: process.env.TAVILY_API_BASE_URL,
   verificationToken: process.env.MARKETPLACE_VERIFICATION_TOKEN
 });
 

@@ -171,11 +171,12 @@ See [`apps/tavily-service/README.md`](./apps/tavily-service/README.md) for the f
 
 ```bash
 export TAVILY_API_KEY=tvly-...
+export TAVILY_API_BASE_URL=https://api.tavily.com
 export TAVILY_SERVICE_PORT=4030
 npm run dev:tavily-service
 ```
 
-This service is not wired into `apps/api`. To use it, create a `marketplace_proxy` provider service in the web UI, point the endpoint upstream at `http://localhost:4030/search` or your deployed host, and serve the marketplace website-verification token from `/.well-known/fast-marketplace-verification.txt` by setting `MARKETPLACE_VERIFICATION_TOKEN` on that service. Provider website verification still expects an HTTPS host.
+This service is not wired into `apps/api`. To use it, create a `marketplace_proxy` provider service in the web UI, import `http://localhost:4030/openapi.json` or your deployed host's `/openapi.json`, review the imported Tavily endpoint drafts, and serve the marketplace website-verification token from `/.well-known/fast-marketplace-verification.txt` by setting `MARKETPLACE_VERIFICATION_TOKEN` on that service. Provider website verification still expects an HTTPS host.
 
 8. Use the CLI:
 
