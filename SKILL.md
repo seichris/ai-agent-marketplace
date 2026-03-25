@@ -1,6 +1,6 @@
 ---
 name: fast-marketplace
-description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.example.com or api.marketplace.example.com, or manage marketplace supply from the provider/admin surfaces. Route direct FAST SDK, AllSet bridge, hosted ramp, or generic x402 package work outside the marketplace to the main FAST skill instead.
+description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.fast.xyz or fastapi.8o.vc, or manage marketplace supply from the provider/admin surfaces. Route direct FAST SDK, AllSet bridge, hosted ramp, or generic x402 package work outside the marketplace to the main FAST skill instead.
 ---
 
 # Fast Marketplace
@@ -13,12 +13,13 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 - keep this skill scoped to marketplace-hosted routes, provider workflows, and admin workflows
 - if the task is direct wallet work, bridge/ramp work, or generic x402 package integration outside marketplace routes, use the main FAST skill at `https://skill.fast.xyz/skill.md`
 - marketplace v1 is Fast-only; do not broaden this skill into generic EVM or non-marketplace API monetization guidance
+- the canonical public hosts are `https://marketplace.fast.xyz` for the web app and `https://fastapi.8o.vc` for the API; non-production deployments may rewrite these URLs when serving `/skill.md`
 
 ## Use this skill when
 
-- the user wants to find a service or endpoint on `https://marketplace.example.com`
+- the user wants to find a service or endpoint on `https://marketplace.fast.xyz`
 - the user needs the exact request body, proxy URL, or response shape for a marketplace endpoint
-- the user wants to sign into `https://marketplace.example.com` with a Fast browser wallet
+- the user wants to sign into `https://marketplace.fast.xyz` with a Fast browser wallet
 - the user wants to pay and execute a marketplace route directly from the website with the Fast browser extension
 - the user needs to call a fixed-price x402 route, a variable top-up route, or a prepaid-credit route with a local Fast wallet
 - the user needs to retrieve an async result from a previously accepted job
@@ -50,7 +51,8 @@ Before acting, identify:
 - whether they want browser login only, browser execution, or a CLI/agent-wallet flow
 - whether they already have a funded Fast wallet
 - which Fast network the deployment is using: mainnet or testnet
-- which settlement token the published marketplace route expects for that deployment; marketplace deployments currently use `USDC` on mainnet and `testUSDC` on testnet
+- which settlement token the published marketplace route expects for that deployment; marketplace uses `USDC` on mainnet and `testUSDC` on testnet
+- which x402 `accepts[*].asset` id the route returned; treat that asset id as authoritative over any human nickname
 - whether they need website session auth, API-scoped wallet session auth, job retrieval auth, or admin token auth
 - for provider flows: service metadata, payout wallet, website URL, endpoint schemas/examples, and upstream execution details
 
@@ -74,9 +76,179 @@ Examples:
 - `npm run cli -- auth api-session <provider> <operation>`
 - `npm run cli -- provider sync --spec ./provider-spec.json`
 
+## Concrete buyer call patterns
+
+Use the marketplace contract directly instead of inferring missing details.
+
+### x402 package and wallet shape
+
+- the current workspace dependency is `@fastxyz/x402-client@^0.1.2`
+- import `x402Pay` from `@fastxyz/x402-client`
+- the wallet object passed to `x402Pay` is a Fast wallet config with this shape:
+
+```ts
+{
+  type: "fast",
+  privateKey: "<hex private key>",
+  publicKey: "<hex public key>",
+  address: "fast1...",
+  rpcUrl: "https://api.fast.xyz/proxy"
+}
+```
+
+### Fixed-price x402 example
+
+```ts
+import { x402Pay } from "@fastxyz/x402-client";
+
+const result = await x402Pay({
+  url: "https://fastapi.8o.vc/api/orders/place-order",
+  method: "POST",
+  body: JSON.stringify({ sku: "abc", quantity: 1 }),
+  headers: {
+    "content-type": "application/json",
+    "PAYMENT-IDENTIFIER": "payment_123"
+  },
+  wallet: {
+    type: "fast",
+    privateKey: process.env.FAST_PRIVATE_KEY!,
+    publicKey: process.env.FAST_PUBLIC_KEY!,
+    address: process.env.FAST_ADDRESS!,
+    rpcUrl: "https://api.fast.xyz/proxy"
+  }
+});
+```
+
+Notes:
+
+- send the first request without payment proof; `x402Pay` handles the `402` quote and retry
+- keep `PAYMENT-IDENTIFIER` stable when retrying the same normalized request
+- for fixed-price or top-up routes, read `accepts[*].network`, `accepts[*].maxAmountRequired`, and `accepts[*].asset` from the `402` response before approving payment
+
+### API-scoped wallet session example
+
+Use route-scoped bearer auth for `prepaid_credit` and async free routes.
+
+```ts
+const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    wallet: "fast1...",
+    resourceType: "api",
+    resourceId: "orders.place-order.v1"
+  })
+}).then((response) => response.json());
+
+const signed = await connector.sign({ message: challenge.message });
+
+const session = await fetch("https://fastapi.8o.vc/auth/session", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    wallet: "fast1...",
+    resourceType: "api",
+    resourceId: "orders.place-order.v1",
+    nonce: challenge.nonce,
+    expiresAt: challenge.expiresAt,
+    signature: signed.signature
+  })
+}).then((response) => response.json());
+
+const apiResponse = await fetch("https://fastapi.8o.vc/api/orders/place-order", {
+  method: "POST",
+  headers: {
+    "content-type": "application/json",
+    authorization: `Bearer ${session.accessToken}`
+  },
+  body: JSON.stringify({ sku: "abc", quantity: 1 })
+});
+```
+
+The challenge response shape is:
+
+```json
+{
+  "wallet": "fast1...",
+  "resourceType": "api",
+  "resourceId": "orders.place-order.v1",
+  "nonce": "uuid",
+  "expiresAt": "2026-03-25T12:00:00.000Z",
+  "message": "Fast Marketplace Access\nWallet: fast1...\nResource: api/orders.place-order.v1\nNonce: uuid\nExpires: 2026-03-25T12:00:00.000Z"
+}
+```
+
+### Async job polling example
+
+If a trigger returns `202`, save the `jobToken`, mint a job-scoped bearer token, then poll the job endpoint.
+
+```ts
+const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    wallet: "fast1...",
+    resourceType: "job",
+    resourceId: "job_123"
+  })
+}).then((response) => response.json());
+
+const signed = await connector.sign({ message: challenge.message });
+
+const session = await fetch("https://fastapi.8o.vc/auth/session", {
+  method: "POST",
+  headers: { "content-type": "application/json" },
+  body: JSON.stringify({
+    wallet: "fast1...",
+    resourceType: "job",
+    resourceId: "job_123",
+    nonce: challenge.nonce,
+    expiresAt: challenge.expiresAt,
+    signature: signed.signature
+  })
+}).then((response) => response.json());
+
+const job = await fetch("https://fastapi.8o.vc/api/jobs/job_123", {
+  headers: {
+    authorization: `Bearer ${session.accessToken}`
+  }
+}).then((response) => response.json());
+```
+
+The job response shape is:
+
+```json
+{
+  "jobToken": "job_123",
+  "status": "pending",
+  "updatedAt": "2026-03-25T12:00:05.000Z"
+}
+```
+
+Completed or failed jobs may also include:
+
+```json
+{
+  "jobToken": "job_123",
+  "status": "failed",
+  "error": "Provider timeout",
+  "refund": {
+    "status": "sent",
+    "txHash": "0x..."
+  },
+  "updatedAt": "2026-03-25T12:00:35.000Z"
+}
+```
+
+Polling guidance:
+
+- use the same wallet that paid for or authorized the original trigger
+- poll `GET /api/jobs/{jobToken}` about every `5000` ms by default; that matches the marketplace `DEFAULT_JOB_POLL_INTERVAL_MS`
+- stop polling when `status` becomes `completed` or `failed`
+
 ## Buyer workflow
 
-1. Open the marketplace UI at `https://marketplace.example.com` and locate the relevant service.
+1. Open the marketplace UI at `https://marketplace.fast.xyz` and locate the relevant service.
 2. Open the service page and identify the route billing type from the published endpoint docs, labels, pricing, and examples.
 3. If the user wants browser execution, use the endpoint's browser execution panel. Fixed-price and top-up routes pay through x402; prepaid-credit routes and async free routes use the wallet session after the user is signed in.
 4. If the user is delegating the task to another agent, copy the service page's "Use this service" block or the canonical skill URL.
@@ -97,11 +269,20 @@ The marketplace is Fast-native and wallet-first.
 
 ### Fixed x402
 
-1. Use a persistent local Fast wallet funded with the settlement token shown by the published marketplace route. Marketplace deployments currently use `USDC` on mainnet and `testUSDC` on testnet.
+1. Use a persistent local Fast wallet funded with the settlement token shown by the published marketplace route. Mainnet routes use `USDC`; testnet routes use `testUSDC`.
 2. Send the first request without payment proof.
 3. Read the `402` response and payment requirements.
 4. Authorize payment from the wallet.
 5. Retry the same request with the payment proof.
+
+Interpret the `402` body as follows:
+
+- `accepts[*].network` is the Fast payment network, such as `fast-mainnet` or `fast-testnet`
+- `accepts[*].maxAmountRequired` is the decimal amount to authorize
+- `accepts[*].asset` is the asset id the signer must pay; do not substitute a nickname like `fastUSDC`
+- current marketplace asset ids are:
+  `USDC` mainnet: `0xc655a12330da6af361d281b197996d2bc135aaed3b66278e729c2222291e9130`
+  `testUSDC` testnet: `0xd73a0679a2be46981e2a8aedecd951c8b6690e7d5f8502b34ed3ff4cc2163b46`
 
 ### Variable top-up
 
@@ -148,6 +329,7 @@ Important constraints:
 ## API session flow
 
 1. Create an API-scoped wallet challenge through `/auth/challenge` with `resourceType: "api"` and the route id as `resourceId`.
+   The route id is the published route identifier, for example `orders.place-order.v1`.
 2. Sign the challenge with the same Fast wallet that owns the prepaid credit.
 3. Exchange it at `/auth/session` for a bearer token.
 4. Use that bearer token on `prepaid_credit` routes.
@@ -156,7 +338,7 @@ Important constraints:
 
 1. If a trigger returns `202`, persist the `jobToken`.
 2. Create the job-scoped wallet auth session through `/auth/challenge` and `/auth/session`.
-3. Poll `GET /api/jobs/{jobToken}` until the job completes or fails.
+3. Poll `GET /api/jobs/{jobToken}` with `Authorization: Bearer <accessToken>` every `5000` ms until the job completes or fails.
 4. Use the same wallet that authorized the original trigger.
 
 ## Refund flow
@@ -229,21 +411,21 @@ Important provider constraints:
 
 ## Discovery and reference URLs
 
-- Marketplace UI: `https://marketplace.example.com`
-- Canonical skill: `https://marketplace.example.com/skill.md`
+- Marketplace UI: `https://marketplace.fast.xyz`
+- Canonical skill: `https://marketplace.fast.xyz/skill.md`
 - Main FAST skill: `https://skill.fast.xyz/skill.md`
-- Suggest an endpoint: `https://marketplace.example.com/suggest?type=endpoint`
-- Suggest a source: `https://marketplace.example.com/suggest?type=source`
-- Provider dashboard: `https://marketplace.example.com/providers`
-- Provider onboarding: `https://marketplace.example.com/providers/onboard`
-- Provider services: `https://marketplace.example.com/providers/services`
-- Admin login: `https://marketplace.example.com/admin/login`
-- Admin provider services: `https://marketplace.example.com/admin/services`
-- Admin suggestions: `https://marketplace.example.com/admin/suggestions`
+- Suggest an endpoint: `https://marketplace.fast.xyz/suggest?type=endpoint`
+- Suggest a source: `https://marketplace.fast.xyz/suggest?type=source`
+- Provider dashboard: `https://marketplace.fast.xyz/providers`
+- Provider onboarding: `https://marketplace.fast.xyz/providers/onboard`
+- Provider services: `https://marketplace.fast.xyz/providers/services`
+- Admin login: `https://marketplace.fast.xyz/admin/login`
+- Admin provider services: `https://marketplace.fast.xyz/admin/services`
+- Admin suggestions: `https://marketplace.fast.xyz/admin/suggestions`
 - Website wallet login: use the `Connect Wallet` control in the site header
-- OpenAPI: `https://api.marketplace.example.com/openapi.json`
-- LLM summary: `https://api.marketplace.example.com/llms.txt`
-- Marketplace catalog JSON: `https://api.marketplace.example.com/.well-known/marketplace.json`
+- OpenAPI: `https://fastapi.8o.vc/openapi.json`
+- LLM summary: `https://fastapi.8o.vc/llms.txt`
+- Marketplace catalog JSON: `https://fastapi.8o.vc/.well-known/marketplace.json`
 
 ## Example requests that should trigger this skill
 
