@@ -1,4 +1,5 @@
 import { ProviderServiceReview } from "@/components/provider-service-review";
+import { getClientApiBaseUrl } from "@/lib/api-base-url";
 import { resolveWebDeploymentNetwork } from "@/lib/network";
 
 export const dynamic = "force-dynamic";
@@ -8,7 +9,7 @@ export default async function ProviderServiceReviewPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const apiBaseUrl = process.env.MARKETPLACE_API_BASE_URL ?? "http://localhost:3000";
+  const apiBaseUrl = getClientApiBaseUrl();
   const deploymentNetwork = resolveWebDeploymentNetwork(process.env.MARKETPLACE_FAST_NETWORK).deploymentNetwork;
   const { id } = await params;
 

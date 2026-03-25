@@ -4,6 +4,7 @@ import { FaviconSync } from "@/components/favicon-sync";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { getClientApiBaseUrl } from "@/lib/api-base-url";
 import { resolveWebDeploymentNetwork } from "@/lib/network";
 
 import "./globals.css";
@@ -69,7 +70,7 @@ export const metadata: Metadata = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  const apiBaseUrl = process.env.MARKETPLACE_API_BASE_URL ?? "http://localhost:3000";
+  const apiBaseUrl = getClientApiBaseUrl();
   const network = resolveWebDeploymentNetwork(process.env.MARKETPLACE_FAST_NETWORK);
 
   return (

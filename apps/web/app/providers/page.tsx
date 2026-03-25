@@ -1,10 +1,11 @@
 import { ProviderDashboard } from "@/components/provider-dashboard";
+import { getClientApiBaseUrl } from "@/lib/api-base-url";
 import { resolveWebDeploymentNetwork } from "@/lib/network";
 
 export const dynamic = "force-dynamic";
 
 export default function ProvidersPage() {
-  const apiBaseUrl = process.env.MARKETPLACE_API_BASE_URL ?? "http://localhost:3000";
+  const apiBaseUrl = getClientApiBaseUrl();
   const deploymentNetwork = resolveWebDeploymentNetwork(process.env.MARKETPLACE_FAST_NETWORK).deploymentNetwork;
 
   return (
