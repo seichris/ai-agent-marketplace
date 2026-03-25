@@ -754,6 +754,68 @@ describe("shared marketplace helpers", () => {
     expect(second.jobToken).toBeNull();
   });
 
+  it("resets async job timeout metadata when acceptance is persisted after a placeholder", async () => {
+    const store = new InMemoryMarketplaceStore(TESTNET_NETWORK_CONFIG);
+    const asyncRoute = TESTNET_MARKETPLACE_ROUTES.find((route) => route.routeId === "mock.async-report.v1");
+
+    if (!asyncRoute) {
+      throw new Error("Missing async seeded route.");
+    }
+
+    await store.savePendingAsyncJob({
+      jobToken: "job_timeout_reset_1",
+      paymentId: "payment_timeout_reset_1",
+      buyerWallet: "fast1buyertimeout000000000000000000000000000000000000000000000000",
+      route: asyncRoute,
+      quotedPrice: "150000",
+      payoutSplit: buildEscrowSplit({
+        providerAccountId: "mock",
+        providerWallet: null,
+        marketplaceBps: 10000,
+        marketplaceAmount: "150000",
+        providerBps: 0,
+        providerAmount: "0"
+      }),
+      requestId: "request_timeout_reset_1",
+      requestBody: { topic: "timeout reset" },
+      nextPollAt: "2026-03-20T00:05:00.000Z",
+      timeoutAt: null
+    });
+
+    await store.saveAsyncAcceptance({
+      paymentId: "payment_timeout_reset_1",
+      normalizedRequestHash: "hash_timeout_reset_1",
+      buyerWallet: "fast1buyertimeout000000000000000000000000000000000000000000000000",
+      route: asyncRoute,
+      quotedPrice: "150000",
+      payoutSplit: buildEscrowSplit({
+        providerAccountId: "mock",
+        providerWallet: null,
+        marketplaceBps: 10000,
+        marketplaceAmount: "150000",
+        providerBps: 0,
+        providerAmount: "0"
+      }),
+      paymentPayload: "payload-timeout-reset-1",
+      facilitatorResponse: { isValid: true },
+      jobToken: "job_timeout_reset_1",
+      requestId: "request_timeout_reset_1",
+      providerJobId: "provider_timeout_reset_1",
+      requestBody: { topic: "timeout reset" },
+      nextPollAt: "2026-03-20T00:06:00.000Z",
+      timeoutAt: "2026-03-20T00:10:00.000Z",
+      responseBody: {
+        jobToken: "job_timeout_reset_1",
+        status: "pending"
+      },
+      responseHeaders: {}
+    });
+
+    const job = await store.getJob("job_timeout_reset_1");
+    expect(job?.nextPollAt).toBe("2026-03-20T00:06:00.000Z");
+    expect(job?.timeoutAt).toBe("2026-03-20T00:10:00.000Z");
+  });
+
   it("tracks prepaid credit balances across topup, reserve, capture, release, and expiry", async () => {
     const store = new InMemoryMarketplaceStore();
     const serviceId = "service_credit_1";

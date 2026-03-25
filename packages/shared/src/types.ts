@@ -997,6 +997,12 @@ export interface MarketplaceStore {
   getIdempotencyByPaymentId(paymentId: string): Promise<IdempotencyRecord | null>;
   claimPaymentExecution(input: ClaimPaymentExecutionInput): Promise<ClaimPaymentExecutionResult>;
   touchPendingPaymentExecution(paymentId: string): Promise<IdempotencyRecord | null>;
+  completePendingJobExecution(input: {
+    paymentId: string;
+    jobToken: string;
+    responseBody: unknown;
+    responseHeaders?: Record<string, string>;
+  }): Promise<IdempotencyRecord | null>;
   listStalePendingPaymentExecutions(updatedBefore: string, limit: number): Promise<IdempotencyRecord[]>;
   saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord>;
   saveAsyncAcceptance(input: SaveAsyncAcceptanceInput): Promise<{ idempotency: IdempotencyRecord; job: JobRecord }>;

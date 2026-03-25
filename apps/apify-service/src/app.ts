@@ -20,6 +20,15 @@ const DEFAULT_SERVICE_DESCRIPTION =
 const DEFAULT_POLL_AFTER_MS = 5000;
 const DEFAULT_DATASET_ITEM_LIMIT = 100;
 
+class ApifyResultFetchError extends Error {
+  constructor(
+    message: string,
+    readonly permanent: boolean
+  ) {
+    super(message);
+  }
+}
+
 export function createApifyServiceApp(options: ApifyServiceOptions): Express {
   const app = express();
   const upstreamBaseUrl = normalizeUpstreamBaseUrl(options.apifyApiBaseUrl ?? DEFAULT_APIFY_API_BASE_URL);
@@ -143,13 +152,24 @@ export function createApifyServiceApp(options: ApifyServiceOptions): Express {
     const normalizedStatus = String(run.status ?? "").toUpperCase();
 
     if (normalizedStatus === "SUCCEEDED") {
-      const result = await fetchApifyResult({
-        upstreamBaseUrl,
-        token: options.apifyApiToken,
-        datasetId: typeof nextProviderState.datasetId === "string" ? nextProviderState.datasetId : null,
-        keyValueStoreId: typeof nextProviderState.keyValueStoreId === "string" ? nextProviderState.keyValueStoreId : null,
-        limit: datasetItemLimit
-      });
+      let result: Awaited<ReturnType<typeof fetchApifyResult>>;
+      try {
+        result = await fetchApifyResult({
+          upstreamBaseUrl,
+          token: options.apifyApiToken,
+          datasetId: typeof nextProviderState.datasetId === "string" ? nextProviderState.datasetId : null,
+          keyValueStoreId: typeof nextProviderState.keyValueStoreId === "string" ? nextProviderState.keyValueStoreId : null,
+          limit: datasetItemLimit
+        });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : "Apify result fetch failed.";
+        return res.json({
+          status: "failed",
+          permanent: error instanceof ApifyResultFetchError ? error.permanent : false,
+          error: message,
+          providerState: nextProviderState
+        });
+      }
 
       return res.json({
         status: "completed",
@@ -213,36 +233,77 @@ async function fetchApifyResult(input: {
   keyValueStoreId: string | null;
   limit: number;
 }): Promise<{ items: unknown[]; output?: unknown }> {
-  if (input.datasetId) {
-    const response = await fetch(buildDatasetItemsUrl(input.upstreamBaseUrl, input.datasetId, input.limit), {
-      method: "GET",
-      headers: {
-        authorization: `Bearer ${input.token}`
-      }
-    });
+  const failures: ApifyResultFetchError[] = [];
 
-    if (response.ok) {
+  if (input.datasetId) {
+    let response: globalThis.Response;
+    try {
+      response = await fetch(buildDatasetItemsUrl(input.upstreamBaseUrl, input.datasetId, input.limit), {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${input.token}`
+        }
+      });
+    } catch (error) {
+      failures.push(new ApifyResultFetchError(
+        error instanceof Error ? error.message : "Apify dataset fetch failed.",
+        false
+      ));
+      response = null as never;
+    }
+
+    if (response?.ok) {
       const body = await safeResponseBody(response);
       return {
         items: Array.isArray(body) ? body : []
       };
     }
+
+    if (response && !response.ok) {
+      failures.push(new ApifyResultFetchError(
+        `Apify dataset fetch failed with status ${response.status}.`,
+        response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429
+      ));
+    }
   }
 
   if (input.keyValueStoreId) {
-    const response = await fetch(buildOutputRecordUrl(input.upstreamBaseUrl, input.keyValueStoreId), {
-      method: "GET",
-      headers: {
-        authorization: `Bearer ${input.token}`
-      }
-    });
+    let response: globalThis.Response;
+    try {
+      response = await fetch(buildOutputRecordUrl(input.upstreamBaseUrl, input.keyValueStoreId), {
+        method: "GET",
+        headers: {
+          authorization: `Bearer ${input.token}`
+        }
+      });
+    } catch (error) {
+      failures.push(new ApifyResultFetchError(
+        error instanceof Error ? error.message : "Apify output fetch failed.",
+        false
+      ));
+      response = null as never;
+    }
 
-    if (response.ok) {
+    if (response?.ok) {
       return {
         items: [],
         output: await safeResponseBody(response)
       };
     }
+
+    if (response && !response.ok) {
+      failures.push(new ApifyResultFetchError(
+        `Apify output fetch failed with status ${response.status}.`,
+        response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429
+      ));
+    }
+  }
+
+  if (failures.length > 0) {
+    throw new ApifyResultFetchError(
+      failures.map((failure) => failure.message).join(" "),
+      failures.every((failure) => failure.permanent)
+    );
   }
 
   return {

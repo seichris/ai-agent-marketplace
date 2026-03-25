@@ -90,10 +90,14 @@ function isPendingJobTimedOut(job: Pick<JobRecord, "timeoutAt">, nowMs: number):
 }
 
 function isPendingJobActionable(
-  job: Pick<JobRecord, "status" | "nextPollAt" | "timeoutAt" | "routeSnapshot">,
+  job: Pick<JobRecord, "status" | "nextPollAt" | "timeoutAt" | "routeSnapshot" | "providerJobId">,
   nowMs: number
 ): boolean {
   if (job.status !== "pending") {
+    return false;
+  }
+
+  if (!job.providerJobId) {
     return false;
   }
 
@@ -172,9 +176,11 @@ function buildAcceptedAsyncJobRecord(
     routeSnapshot: clone(input.route),
     providerState: clone(existing?.providerState ?? input.providerState ?? null),
     nextPollAt: nextStatus === "pending"
-      ? (input.nextPollAt ?? existing?.nextPollAt ?? null)
+      ? (input.nextPollAt ?? null)
       : (existing?.nextPollAt ?? null),
-    timeoutAt: existing?.timeoutAt ?? input.timeoutAt ?? null,
+    timeoutAt: nextStatus === "pending"
+      ? (input.timeoutAt ?? null)
+      : (existing?.timeoutAt ?? input.timeoutAt ?? null),
     status: nextStatus,
     resultBody: clone(existing?.resultBody ?? null),
     errorMessage: existing?.errorMessage ?? null,
@@ -821,6 +827,35 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       updatedAt: timestamp()
     };
     this.idempotencyByPaymentId.set(paymentId, updated);
+    return clone(updated);
+  }
+
+  async completePendingJobExecution(input: {
+    paymentId: string;
+    jobToken: string;
+    responseBody: unknown;
+    responseHeaders?: Record<string, string>;
+  }): Promise<IdempotencyRecord | null> {
+    const existing = this.idempotencyByPaymentId.get(input.paymentId);
+    if (!existing) {
+      return null;
+    }
+
+    if (existing.executionStatus === "completed") {
+      return clone(existing);
+    }
+
+    const updated: IdempotencyRecord = {
+      ...existing,
+      responseKind: "job",
+      responseStatusCode: 202,
+      responseBody: clone(input.responseBody),
+      responseHeaders: clone(input.responseHeaders ?? existing.responseHeaders),
+      executionStatus: "completed",
+      jobToken: existing.jobToken ?? input.jobToken,
+      updatedAt: timestamp()
+    };
+    this.idempotencyByPaymentId.set(input.paymentId, updated);
     return clone(updated);
   }
 
@@ -4468,6 +4503,41 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
     }
 
     return this.getIdempotencyByPaymentId(paymentId);
+  }
+
+  async completePendingJobExecution(input: {
+    paymentId: string;
+    jobToken: string;
+    responseBody: unknown;
+    responseHeaders?: Record<string, string>;
+  }): Promise<IdempotencyRecord | null> {
+    const result = await this.pool.query(
+      `
+      UPDATE idempotency_records
+      SET
+        response_kind = 'job',
+        response_status_code = 202,
+        response_body = $2::jsonb,
+        response_headers = COALESCE($3::jsonb, response_headers),
+        execution_status = 'completed',
+        job_token = COALESCE(job_token, $4),
+        updated_at = NOW()
+      WHERE payment_id = $1
+        AND execution_status = 'pending'
+      RETURNING *
+      `,
+      [
+        input.paymentId,
+        JSON.stringify(input.responseBody),
+        input.responseHeaders === undefined ? null : JSON.stringify(input.responseHeaders),
+        input.jobToken
+      ]
+    );
+    if (result.rowCount) {
+      return mapIdempotencyRow(result.rows[0]);
+    }
+
+    return this.getIdempotencyByPaymentId(input.paymentId);
   }
 
   async listStalePendingPaymentExecutions(updatedBefore: string, limit: number): Promise<IdempotencyRecord[]> {

@@ -1880,9 +1880,9 @@ async function handleWalletSessionRoute(input: {
 
   const requestId = randomUUID();
   const jobToken = input.route.mode === "async" ? createOpaqueToken("job") : null;
+  const pendingAsyncNextPollAt = jobToken ? computeTimeoutAt(input.route) : null;
   let paymentDestinationWallet: string | null = null;
   let asyncPayoutSplit: ReturnType<typeof buildPayoutSplit> | null = null;
-  let asyncTimeoutAt: string | null = null;
 
   if (jobToken) {
     try {
@@ -1893,7 +1893,6 @@ async function handleWalletSessionRoute(input: {
         paymentDestinationWallet,
         quotedPrice: "0"
       });
-      asyncTimeoutAt = computeTimeoutAt(input.route);
       await input.store.savePendingAsyncJob({
         jobToken,
         buyerWallet: session.wallet,
@@ -1903,8 +1902,8 @@ async function handleWalletSessionRoute(input: {
         serviceId: input.route.serviceId,
         requestId,
         requestBody: input.requestInput,
-        nextPollAt: asyncTimeoutAt,
-        timeoutAt: asyncTimeoutAt
+        nextPollAt: pendingAsyncNextPollAt,
+        timeoutAt: null
       });
     } catch (error) {
       return input.res.status(500).json({
@@ -2011,7 +2010,7 @@ async function handleWalletSessionRoute(input: {
       requestBody: input.requestInput,
       providerState: executeResult.providerState,
       nextPollAt: computeNextPollAt(executeResult.pollAfterMs),
-      timeoutAt: asyncTimeoutAt ?? computeTimeoutAt(input.route),
+      timeoutAt: computeTimeoutAt(input.route),
       responseBody: acceptedBody
     });
   } catch (error) {
@@ -2307,7 +2306,7 @@ async function handleX402Route(input: {
 
   const requestId = existing.requestId ?? randomUUID();
   const asyncJobToken = input.route.mode === "async" ? (existing.jobToken ?? createOpaqueToken("job")) : null;
-  const asyncTimeoutAt = input.route.mode === "async" ? computeTimeoutAt(input.route) : null;
+  const pendingAsyncNextPollAt = input.route.mode === "async" ? computeTimeoutAt(input.route) : null;
 
   if (isTopupX402Billing(input.route)) {
     try {
@@ -2381,8 +2380,8 @@ async function handleX402Route(input: {
         serviceId: input.route.serviceId,
         requestId,
         requestBody,
-        nextPollAt: asyncTimeoutAt,
-        timeoutAt: asyncTimeoutAt
+        nextPollAt: pendingAsyncNextPollAt,
+        timeoutAt: null
       });
     } catch (error) {
       const failedResponse = await buildRejectedSyncResponse({
@@ -2577,7 +2576,7 @@ async function handleX402Route(input: {
       requestBody,
       providerState: executeResult.providerState,
       nextPollAt: computeNextPollAt(executeResult.pollAfterMs),
-      timeoutAt: asyncTimeoutAt,
+      timeoutAt: computeTimeoutAt(input.route),
       responseBody: acceptedBody,
       responseHeaders: paymentResponseHeaders
     });

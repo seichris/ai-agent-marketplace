@@ -427,6 +427,36 @@ function joinUrl(baseUrl: string, path: string): string {
   return `${baseUrl.replace(/\/$/, "")}${path.startsWith("/") ? path : `/${path}`}`;
 }
 
+function buildRecoveredAsyncJobResponse(job: JobRecord, now: Date = new Date()): {
+  jobToken: string;
+  status: "pending";
+  pollAfterMs?: number;
+} {
+  const response: {
+    jobToken: string;
+    status: "pending";
+    pollAfterMs?: number;
+  } = {
+    jobToken: job.jobToken,
+    status: "pending"
+  };
+
+  if (job.status === "pending" && job.nextPollAt) {
+    const nextPollAtMs = Date.parse(job.nextPollAt);
+    if (!Number.isNaN(nextPollAtMs)) {
+      response.pollAfterMs = Math.max(1_000, nextPollAtMs - now.getTime());
+    }
+  }
+
+  return response;
+}
+
+function canRecoverPendingJobExecution(job: JobRecord): boolean {
+  return job.status !== "pending"
+    || job.routeSnapshot.asyncConfig?.strategy === "webhook"
+    || Boolean(job.providerJobId);
+}
+
 async function recoverStalePendingPayments(input: {
   store: MarketplaceStore;
   refundService: RefundService;
@@ -438,6 +468,19 @@ async function recoverStalePendingPayments(input: {
   for (const payment of pendingPayments) {
     if (payment.pendingRecoveryAction === "retry") {
       continue;
+    }
+
+    if (payment.responseKind === "job" && payment.jobToken) {
+      const job = await input.store.getJob(payment.jobToken);
+      if (job && canRecoverPendingJobExecution(job)) {
+        await input.store.completePendingJobExecution({
+          paymentId: payment.paymentId,
+          jobToken: job.jobToken,
+          responseBody: buildRecoveredAsyncJobResponse(job),
+          responseHeaders: payment.responseHeaders
+        });
+        continue;
+      }
     }
 
     const existingRefund = await input.store.getRefundByPaymentId(payment.paymentId);

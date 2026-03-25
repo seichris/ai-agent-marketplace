@@ -133,4 +133,64 @@ describe("apify service", () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
+
+  it("surfaces Apify result-fetch failures instead of returning an empty completed result", async () => {
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockImplementation(async (input) => {
+      const url = String(input);
+      if (url === "https://api.apify.com/v2/actor-runs/run_404") {
+        return new Response(JSON.stringify({
+          data: {
+            id: "run_404",
+            status: "SUCCEEDED",
+            defaultDatasetId: "dataset_missing"
+          }
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      if (url.startsWith("https://api.apify.com/v2/datasets/dataset_missing/items")) {
+        return new Response(JSON.stringify({
+          error: "Dataset not found"
+        }), {
+          status: 404,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      return new Response("not found", { status: 404 });
+    });
+
+    const app = createApifyServiceApp({
+      apifyApiToken: "apify-test-token",
+      actorId: "apify~instagram-scraper"
+    });
+
+    const response = await request(app)
+      .post("/runs/poll")
+      .send({
+        providerJobId: "run_404",
+        providerState: {
+          datasetId: "dataset_missing"
+        }
+      });
+
+    expect(response.status).toBe(200);
+    expect(response.body).toEqual({
+      status: "failed",
+      permanent: true,
+      error: "Apify dataset fetch failed with status 404.",
+      providerState: {
+        actorId: "apify~instagram-scraper",
+        datasetId: "dataset_missing",
+        keyValueStoreId: null
+      }
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
 });
