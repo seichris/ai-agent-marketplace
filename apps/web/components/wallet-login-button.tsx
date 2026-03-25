@@ -207,7 +207,7 @@ export function WalletLoginButton({
               <>
                 <span>Connect to</span>
                 <img
-                  src="/brand/fast-logo-dark.svg"
+                  src="/brand/fast-logo-light.svg"
                   alt=""
                   aria-hidden="true"
                   width={146}
@@ -215,7 +215,7 @@ export function WalletLoginButton({
                   className="block h-4 w-auto dark:hidden"
                 />
                 <img
-                  src="/brand/fast-logo-light.svg"
+                  src="/brand/fast-logo-dark.svg"
                   alt=""
                   aria-hidden="true"
                   width={146}
