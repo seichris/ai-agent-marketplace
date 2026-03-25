@@ -764,7 +764,7 @@ export interface IdempotencyRecord {
 
 export interface JobRecord {
   jobToken: string;
-  paymentId: string;
+  paymentId: string | null;
   routeId: string;
   serviceId: string | null;
   provider: string;
@@ -773,7 +773,7 @@ export interface JobRecord {
   quotedPrice: string;
   payoutSplit: PersistedPayoutSplit;
   requestId: string;
-  providerJobId: string;
+  providerJobId: string | null;
   requestBody: unknown;
   routeSnapshot: MarketplaceRoute;
   providerState: Record<string, unknown> | null;
@@ -939,6 +939,20 @@ export interface SaveAsyncAcceptanceInput {
   responseHeaders?: Record<string, string>;
 }
 
+export interface SavePendingAsyncJobInput {
+  jobToken: string;
+  paymentId?: string | null;
+  buyerWallet: string;
+  route: MarketplaceRoute;
+  quotedPrice: string;
+  payoutSplit: PersistedPayoutSplit;
+  serviceId?: string | null;
+  requestId: string;
+  requestBody: unknown;
+  nextPollAt?: string | null;
+  timeoutAt?: string | null;
+}
+
 export interface ClaimPaymentExecutionInput {
   paymentId: string;
   normalizedRequestHash: string;
@@ -986,6 +1000,7 @@ export interface MarketplaceStore {
   listStalePendingPaymentExecutions(updatedBefore: string, limit: number): Promise<IdempotencyRecord[]>;
   saveSyncIdempotency(input: SaveSyncIdempotencyInput): Promise<IdempotencyRecord>;
   saveAsyncAcceptance(input: SaveAsyncAcceptanceInput): Promise<{ idempotency: IdempotencyRecord; job: JobRecord }>;
+  savePendingAsyncJob(input: SavePendingAsyncJobInput): Promise<JobRecord>;
   getJob(jobToken: string): Promise<JobRecord | null>;
   listPendingJobs(input: { limit: number; now?: string }): Promise<JobRecord[]>;
   updateJobPending(input: { jobToken: string; providerState?: Record<string, unknown> | null; nextPollAt?: string | null }): Promise<JobRecord>;

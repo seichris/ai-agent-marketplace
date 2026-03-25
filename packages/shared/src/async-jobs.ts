@@ -34,6 +34,9 @@ export async function resolveAsyncJobFailure(input: {
   if (!job.payoutSplit.usesTreasurySettlement || !requiresX402Payment(job.routeSnapshot)) {
     return { job, refund: null };
   }
+  if (!job.paymentId) {
+    throw new Error(`Missing paymentId for refundable async job ${job.jobToken}.`);
+  }
 
   const refund = await input.store.createRefund({
     jobToken: job.jobToken,

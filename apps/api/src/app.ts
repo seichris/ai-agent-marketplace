@@ -1505,7 +1505,7 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
       return res.status(400).json({ error: "Callback validation failed.", issues: parsed.error.issues });
     }
 
-    if (job.providerJobId !== parsed.data.providerJobId) {
+    if (job.providerJobId && job.providerJobId !== parsed.data.providerJobId) {
       return res.status(409).json({ error: "providerJobId does not match the pending job." });
     }
 
@@ -1880,6 +1880,38 @@ async function handleWalletSessionRoute(input: {
 
   const requestId = randomUUID();
   const jobToken = input.route.mode === "async" ? createOpaqueToken("job") : null;
+  let paymentDestinationWallet: string | null = null;
+  let asyncPayoutSplit: ReturnType<typeof buildPayoutSplit> | null = null;
+  let asyncTimeoutAt: string | null = null;
+
+  if (jobToken) {
+    try {
+      paymentDestinationWallet = resolvePaymentDestinationWallet(input.route, input.payTo);
+      asyncPayoutSplit = buildPayoutSplit({
+        route: input.route,
+        treasuryWallet: input.payTo,
+        paymentDestinationWallet,
+        quotedPrice: "0"
+      });
+      asyncTimeoutAt = computeTimeoutAt(input.route);
+      await input.store.savePendingAsyncJob({
+        jobToken,
+        buyerWallet: session.wallet,
+        route: input.route,
+        quotedPrice: "0",
+        payoutSplit: asyncPayoutSplit,
+        serviceId: input.route.serviceId,
+        requestId,
+        requestBody: input.requestInput,
+        nextPollAt: asyncTimeoutAt,
+        timeoutAt: asyncTimeoutAt
+      });
+    } catch (error) {
+      return input.res.status(500).json({
+        error: error instanceof Error ? error.message : "Async job initialization failed."
+      });
+    }
+  }
 
   await recordProviderAttemptSafely(input.store, {
     routeId: input.route.routeId,
@@ -1904,6 +1936,9 @@ async function handleWalletSessionRoute(input: {
       secretsKey: input.secretsKey
     });
   } catch (error) {
+    if (jobToken) {
+      await failPendingAsyncJobSafely(input.store, jobToken, error instanceof Error ? error.message : "Wallet-session route execution failed.");
+    }
     await recordProviderAttemptSafely(input.store, {
       routeId: input.route.routeId,
       requestId,
@@ -1920,6 +1955,15 @@ async function handleWalletSessionRoute(input: {
   }
 
   if (executeResult.kind === "sync") {
+    if (jobToken) {
+      await failPendingAsyncJobSafely(
+        input.store,
+        jobToken,
+        executeResult.statusCode >= 200 && executeResult.statusCode < 400
+          ? "Async route returned a synchronous response."
+          : `Async route failed with status ${executeResult.statusCode} before acceptance.`
+      );
+    }
     await recordProviderAttemptSafely(input.store, {
       routeId: input.route.routeId,
       requestId,
@@ -1936,15 +1980,6 @@ async function handleWalletSessionRoute(input: {
       .json(executeResult.body);
   }
 
-  let paymentDestinationWallet: string;
-  try {
-    paymentDestinationWallet = resolvePaymentDestinationWallet(input.route, input.payTo);
-  } catch (error) {
-    return input.res.status(500).json({
-      error: error instanceof Error ? error.message : "Route settlement configuration is invalid."
-    });
-  }
-
   const acceptedBody = {
     jobToken: jobToken ?? createOpaqueToken("job"),
     status: "pending",
@@ -1952,21 +1987,18 @@ async function handleWalletSessionRoute(input: {
   };
 
   try {
-    const quotedPrice = "0";
-    const payoutSplit = buildPayoutSplit({
-      route: input.route,
-      treasuryWallet: input.payTo,
-      paymentDestinationWallet,
-      quotedPrice
-    });
-
     await input.store.saveAsyncAcceptance({
       paymentId: createOpaqueToken("wallet"),
       normalizedRequestHash: hashNormalizedRequest(input.route, input.requestInput),
       buyerWallet: session.wallet,
       route: input.route,
-      quotedPrice,
-      payoutSplit,
+      quotedPrice: "0",
+      payoutSplit: asyncPayoutSplit ?? buildPayoutSplit({
+        route: input.route,
+        treasuryWallet: input.payTo,
+        paymentDestinationWallet: paymentDestinationWallet ?? resolvePaymentDestinationWallet(input.route, input.payTo),
+        quotedPrice: "0"
+      }),
       paymentPayload: "",
       facilitatorResponse: {
         type: input.route.billing.type,
@@ -1979,7 +2011,7 @@ async function handleWalletSessionRoute(input: {
       requestBody: input.requestInput,
       providerState: executeResult.providerState,
       nextPollAt: computeNextPollAt(executeResult.pollAfterMs),
-      timeoutAt: computeTimeoutAt(input.route),
+      timeoutAt: asyncTimeoutAt ?? computeTimeoutAt(input.route),
       responseBody: acceptedBody
     });
   } catch (error) {
@@ -2274,6 +2306,8 @@ async function handleX402Route(input: {
   }
 
   const requestId = existing.requestId ?? randomUUID();
+  const asyncJobToken = input.route.mode === "async" ? (existing.jobToken ?? createOpaqueToken("job")) : null;
+  const asyncTimeoutAt = input.route.mode === "async" ? computeTimeoutAt(input.route) : null;
 
   if (isTopupX402Billing(input.route)) {
     try {
@@ -2335,6 +2369,58 @@ async function handleX402Route(input: {
     }
   }
 
+  if (asyncJobToken) {
+    try {
+      await input.store.savePendingAsyncJob({
+        jobToken: asyncJobToken,
+        paymentId: paymentHeaders.paymentId,
+        buyerWallet,
+        route: input.route,
+        quotedPrice,
+        payoutSplit,
+        serviceId: input.route.serviceId,
+        requestId,
+        requestBody,
+        nextPollAt: asyncTimeoutAt,
+        timeoutAt: asyncTimeoutAt
+      });
+    } catch (error) {
+      const failedResponse = await buildRejectedSyncResponse({
+        executeResult: {
+          kind: "sync",
+          statusCode: 500,
+          body: {
+            error: error instanceof Error ? error.message : "Async job initialization failed."
+          }
+        },
+        paymentId: paymentHeaders.paymentId,
+        buyerWallet,
+        quotedPrice,
+        route: input.route,
+        store: input.store,
+        refundService: input.refundService
+      });
+
+      await input.store.saveSyncIdempotency({
+        paymentId: paymentHeaders.paymentId,
+        normalizedRequestHash: requestHash,
+        buyerWallet,
+        routeId: input.route.routeId,
+        routeVersion: input.route.version,
+        quotedPrice,
+        payoutSplit,
+        paymentPayload: paymentHeaders.paymentPayload,
+        facilitatorResponse: verifyResult,
+        statusCode: failedResponse.statusCode,
+        body: failedResponse.body,
+        headers: failedResponse.headers,
+        requestId
+      });
+
+      return input.res.status(failedResponse.statusCode).set(failedResponse.headers).json(failedResponse.body);
+    }
+  }
+
   let executeResult: Awaited<ReturnType<typeof executeRoute>>;
   try {
     executeResult = await executeRoute({
@@ -2343,13 +2429,16 @@ async function handleX402Route(input: {
       buyerWallet,
       requestId,
       paymentId: paymentHeaders.paymentId,
-      jobToken: existing.jobToken ?? null,
+      jobToken: asyncJobToken,
       marketplaceBaseUrl: input.marketplaceBaseUrl,
       providers: input.providers,
       store: input.store,
       secretsKey: input.secretsKey
     });
   } catch (error) {
+    if (asyncJobToken) {
+      await failPendingAsyncJobSafely(input.store, asyncJobToken, error instanceof Error ? error.message : "Route execution failed.");
+    }
     const failedResponse = await buildRejectedSyncResponse({
       executeResult: {
         kind: "sync",
@@ -2386,6 +2475,15 @@ async function handleX402Route(input: {
   }
 
   if (executeResult.kind === "sync") {
+    if (asyncJobToken) {
+      await failPendingAsyncJobSafely(
+        input.store,
+        asyncJobToken,
+        executeResult.statusCode >= 200 && executeResult.statusCode < 400
+          ? "Async route returned a synchronous response."
+          : `Async route failed with status ${executeResult.statusCode} before acceptance.`
+      );
+    }
     if (executeResult.statusCode < 200 || executeResult.statusCode >= 400) {
       const failedResponse = await buildRejectedSyncResponse({
         executeResult,
@@ -2455,7 +2553,7 @@ async function handleX402Route(input: {
       .json(executeResult.body);
   }
 
-  const jobToken = existing.jobToken ?? createOpaqueToken("job");
+  const jobToken = asyncJobToken ?? createOpaqueToken("job");
   const acceptedBody = {
     jobToken,
     status: "pending",
@@ -2479,7 +2577,7 @@ async function handleX402Route(input: {
       requestBody,
       providerState: executeResult.providerState,
       nextPollAt: computeNextPollAt(executeResult.pollAfterMs),
-      timeoutAt: computeTimeoutAt(input.route),
+      timeoutAt: asyncTimeoutAt,
       responseBody: acceptedBody,
       responseHeaders: paymentResponseHeaders
     });
@@ -2510,6 +2608,19 @@ async function recordProviderAttemptSafely(
     await store.recordProviderAttempt(attempt);
   } catch (error) {
     console.error("Failed to record provider attempt:", error);
+  }
+}
+
+async function failPendingAsyncJobSafely(store: MarketplaceStore, jobToken: string, errorMessage: string) {
+  try {
+    const job = await store.getJob(jobToken);
+    if (!job || job.status !== "pending") {
+      return;
+    }
+
+    await store.failJob(jobToken, errorMessage);
+  } catch (error) {
+    console.error("Failed to fail pending async job:", error);
   }
 }
 

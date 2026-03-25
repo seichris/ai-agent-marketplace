@@ -56,6 +56,7 @@ import type {
   RouteAsyncConfig,
   RouteMode,
   SaveAsyncAcceptanceInput,
+  SavePendingAsyncJobInput,
   SaveSyncIdempotencyInput,
   ServiceAnalytics,
   SettlementMode,
@@ -110,6 +111,78 @@ function isPendingJobActionable(
 
   const nextPollMs = Date.parse(job.nextPollAt);
   return Number.isNaN(nextPollMs) || nextPollMs <= nowMs;
+}
+
+function resolveRouteServiceId(route: MarketplaceRoute, serviceId?: string | null): string | null {
+  return serviceId ?? ("serviceId" in route ? (route.serviceId as string) : null);
+}
+
+function buildPendingAsyncJobRecord(
+  input: SavePendingAsyncJobInput,
+  existing: JobRecord | null,
+  now: string
+): JobRecord {
+  const initialNextPollAt = input.nextPollAt ?? input.timeoutAt ?? null;
+  return {
+    jobToken: input.jobToken,
+    paymentId: existing?.paymentId ?? input.paymentId ?? null,
+    routeId: input.route.routeId,
+    serviceId: existing?.serviceId ?? resolveRouteServiceId(input.route, input.serviceId),
+    provider: input.route.provider,
+    operation: input.route.operation,
+    buyerWallet: input.buyerWallet,
+    quotedPrice: input.quotedPrice,
+    payoutSplit: clone(input.payoutSplit),
+    requestId: existing?.requestId ?? input.requestId,
+    providerJobId: existing?.providerJobId ?? null,
+    requestBody: clone(input.requestBody),
+    routeSnapshot: clone(input.route),
+    providerState: clone(existing?.providerState ?? null),
+    nextPollAt: existing?.nextPollAt ?? initialNextPollAt,
+    timeoutAt: existing?.timeoutAt ?? input.timeoutAt ?? null,
+    status: existing?.status ?? "pending",
+    resultBody: clone(existing?.resultBody ?? null),
+    errorMessage: existing?.errorMessage ?? null,
+    refundStatus: existing?.refundStatus ?? "not_required",
+    refundId: existing?.refundId ?? null,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
+}
+
+function buildAcceptedAsyncJobRecord(
+  input: SaveAsyncAcceptanceInput,
+  existing: JobRecord | null,
+  now: string
+): JobRecord {
+  const nextStatus = existing?.status ?? "pending";
+  return {
+    jobToken: existing?.jobToken ?? input.jobToken,
+    paymentId: existing?.paymentId ?? input.paymentId,
+    routeId: input.route.routeId,
+    serviceId: existing?.serviceId ?? resolveRouteServiceId(input.route, input.serviceId),
+    provider: input.route.provider,
+    operation: input.route.operation,
+    buyerWallet: input.buyerWallet,
+    quotedPrice: input.quotedPrice,
+    payoutSplit: clone(input.payoutSplit),
+    requestId: existing?.requestId ?? input.requestId,
+    providerJobId: existing?.providerJobId ?? input.providerJobId,
+    requestBody: clone(existing?.requestBody ?? input.requestBody),
+    routeSnapshot: clone(input.route),
+    providerState: clone(existing?.providerState ?? input.providerState ?? null),
+    nextPollAt: nextStatus === "pending"
+      ? (input.nextPollAt ?? existing?.nextPollAt ?? null)
+      : (existing?.nextPollAt ?? null),
+    timeoutAt: existing?.timeoutAt ?? input.timeoutAt ?? null,
+    status: nextStatus,
+    resultBody: clone(existing?.resultBody ?? null),
+    errorMessage: existing?.errorMessage ?? null,
+    refundStatus: existing?.refundStatus ?? "not_required",
+    refundId: existing?.refundId ?? null,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now
+  };
 }
 
 function normalizeAsyncConfig(value: unknown): RouteAsyncConfig | null {
@@ -828,31 +901,11 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       updatedAt: now
     };
 
-    const job: JobRecord = {
-      jobToken: idempotency.jobToken ?? input.jobToken,
-      paymentId: input.paymentId,
-      routeId: input.route.routeId,
-      serviceId: input.serviceId ?? ("serviceId" in input.route ? (input.route.serviceId as string) : null),
-      provider: input.route.provider,
-      operation: input.route.operation,
-      buyerWallet: input.buyerWallet,
-      quotedPrice: input.quotedPrice,
-      payoutSplit: clone(input.payoutSplit),
-      requestId: input.requestId,
-      providerJobId: input.providerJobId,
-      requestBody: clone(input.requestBody),
-      routeSnapshot: clone(input.route),
-      providerState: clone(input.providerState ?? null),
-      nextPollAt: input.nextPollAt ?? null,
-      timeoutAt: input.timeoutAt ?? null,
-      status: "pending",
-      resultBody: null,
-      errorMessage: null,
-      refundStatus: "not_required",
-      refundId: null,
-      createdAt: now,
-      updatedAt: now
-    };
+    const existingJob = this.jobsByToken.get(idempotency.jobToken ?? input.jobToken) ?? null;
+    const job = buildAcceptedAsyncJobRecord({
+      ...input,
+      jobToken: idempotency.jobToken ?? input.jobToken
+    }, existingJob, now);
 
     this.idempotencyByPaymentId.set(idempotency.paymentId, idempotency);
     this.jobsByToken.set(job.jobToken, job);
@@ -870,6 +923,14 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       idempotency: clone(idempotency),
       job: clone(job)
     };
+  }
+
+  async savePendingAsyncJob(input: SavePendingAsyncJobInput): Promise<JobRecord> {
+    const now = timestamp();
+    const existing = this.jobsByToken.get(input.jobToken) ?? null;
+    const job = buildPendingAsyncJobRecord(input, existing, now);
+    this.jobsByToken.set(job.jobToken, job);
+    return clone(job);
   }
 
   async getJob(jobToken: string): Promise<JobRecord | null> {
@@ -3189,7 +3250,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
       CREATE TABLE IF NOT EXISTS jobs (
         job_token TEXT PRIMARY KEY,
-        payment_id TEXT NOT NULL REFERENCES idempotency_records(payment_id),
+        payment_id TEXT REFERENCES idempotency_records(payment_id),
         route_id TEXT NOT NULL,
         service_id TEXT,
         provider TEXT NOT NULL,
@@ -3198,7 +3259,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         quoted_price TEXT NOT NULL,
         payout_split JSONB NOT NULL DEFAULT '{}'::jsonb,
         request_id TEXT,
-        provider_job_id TEXT NOT NULL,
+        provider_job_id TEXT,
         request_body JSONB NOT NULL,
         route_snapshot JSONB NOT NULL DEFAULT '{}'::jsonb,
         provider_state JSONB,
@@ -3651,6 +3712,12 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
       ALTER TABLE jobs
       ADD COLUMN IF NOT EXISTS timeout_at TIMESTAMPTZ;
+
+      ALTER TABLE jobs
+      ALTER COLUMN payment_id DROP NOT NULL;
+
+      ALTER TABLE jobs
+      ALTER COLUMN provider_job_id DROP NOT NULL;
 
       ALTER TABLE service_suggestions
       ADD COLUMN IF NOT EXISTS claimed_provider_account_id TEXT;
@@ -4481,6 +4548,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
 
     try {
       await client.query("BEGIN");
+      const now = timestamp();
       const idempotencyResult = await client.query(
         `
         INSERT INTO idempotency_records (
@@ -4528,40 +4596,102 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       );
 
       const persistedIdempotency = mapIdempotencyRow(idempotencyResult.rows[0]);
-
-      const jobResult = await client.query(
-        `
-        INSERT INTO jobs (
-          job_token, payment_id, route_id, service_id, provider, operation, buyer_wallet, quoted_price,
-          payout_split, request_id, provider_job_id, request_body, route_snapshot, provider_state, next_poll_at, timeout_at,
-          status, result_body, error_message, refund_status, refund_id
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, 'pending', NULL, NULL, 'not_required', NULL)
-        ON CONFLICT (job_token) DO UPDATE
-        SET
-          service_id = COALESCE(jobs.service_id, EXCLUDED.service_id),
-          request_id = COALESCE(jobs.request_id, EXCLUDED.request_id),
-          updated_at = jobs.updated_at
-        RETURNING *
-        `,
-        [
-          persistedIdempotency.jobToken ?? input.jobToken,
-          input.paymentId,
-          input.route.routeId,
-          input.serviceId ?? ("serviceId" in input.route ? (input.route.serviceId as string) : null),
-          input.route.provider,
-          input.route.operation,
-          input.buyerWallet,
-          input.quotedPrice,
-          JSON.stringify(input.payoutSplit),
-          input.requestId,
-          input.providerJobId,
-          JSON.stringify(input.requestBody),
-          JSON.stringify(input.route),
-          JSON.stringify(input.providerState ?? null),
-          input.nextPollAt ?? null,
-          input.timeoutAt ?? null
-        ]
+      const persistedJobToken = persistedIdempotency.jobToken ?? input.jobToken;
+      const existingJobResult = await client.query(
+        "SELECT * FROM jobs WHERE job_token = $1 LIMIT 1 FOR UPDATE",
+        [persistedJobToken]
       );
+      const mergedJob = buildAcceptedAsyncJobRecord({
+        ...input,
+        jobToken: persistedJobToken
+      }, existingJobResult.rowCount ? mapJobRow(existingJobResult.rows[0]) : null, now);
+
+      const jobResult = existingJobResult.rowCount
+        ? await client.query(
+            `
+            UPDATE jobs
+            SET
+              payment_id = $2,
+              route_id = $3,
+              service_id = $4,
+              provider = $5,
+              operation = $6,
+              buyer_wallet = $7,
+              quoted_price = $8,
+              payout_split = $9::jsonb,
+              request_id = $10,
+              provider_job_id = $11,
+              request_body = $12::jsonb,
+              route_snapshot = $13::jsonb,
+              provider_state = $14::jsonb,
+              next_poll_at = $15,
+              timeout_at = $16,
+              status = $17,
+              result_body = $18::jsonb,
+              error_message = $19,
+              refund_status = $20,
+              refund_id = $21,
+              updated_at = NOW()
+            WHERE job_token = $1
+            RETURNING *
+            `,
+            [
+              mergedJob.jobToken,
+              mergedJob.paymentId,
+              mergedJob.routeId,
+              mergedJob.serviceId,
+              mergedJob.provider,
+              mergedJob.operation,
+              mergedJob.buyerWallet,
+              mergedJob.quotedPrice,
+              JSON.stringify(mergedJob.payoutSplit),
+              mergedJob.requestId,
+              mergedJob.providerJobId,
+              JSON.stringify(mergedJob.requestBody),
+              JSON.stringify(mergedJob.routeSnapshot),
+              JSON.stringify(mergedJob.providerState ?? null),
+              mergedJob.nextPollAt,
+              mergedJob.timeoutAt,
+              mergedJob.status,
+              JSON.stringify(mergedJob.resultBody),
+              mergedJob.errorMessage,
+              mergedJob.refundStatus,
+              mergedJob.refundId
+            ]
+          )
+        : await client.query(
+            `
+            INSERT INTO jobs (
+              job_token, payment_id, route_id, service_id, provider, operation, buyer_wallet, quoted_price,
+              payout_split, request_id, provider_job_id, request_body, route_snapshot, provider_state, next_poll_at, timeout_at,
+              status, result_body, error_message, refund_status, refund_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17, $18::jsonb, $19, $20, $21)
+            RETURNING *
+            `,
+            [
+              mergedJob.jobToken,
+              mergedJob.paymentId,
+              mergedJob.routeId,
+              mergedJob.serviceId,
+              mergedJob.provider,
+              mergedJob.operation,
+              mergedJob.buyerWallet,
+              mergedJob.quotedPrice,
+              JSON.stringify(mergedJob.payoutSplit),
+              mergedJob.requestId,
+              mergedJob.providerJobId,
+              JSON.stringify(mergedJob.requestBody),
+              JSON.stringify(mergedJob.routeSnapshot),
+              JSON.stringify(mergedJob.providerState ?? null),
+              mergedJob.nextPollAt,
+              mergedJob.timeoutAt,
+              mergedJob.status,
+              JSON.stringify(mergedJob.resultBody),
+              mergedJob.errorMessage,
+              mergedJob.refundStatus,
+              mergedJob.refundId
+            ]
+          );
 
       await client.query(
         `
@@ -4585,6 +4715,115 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
         idempotency: persistedIdempotency,
         job: mapJobRow(jobResult.rows[0])
       };
+    } catch (error) {
+      await client.query("ROLLBACK");
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
+  async savePendingAsyncJob(input: SavePendingAsyncJobInput): Promise<JobRecord> {
+    const client = await this.pool.connect();
+
+    try {
+      await client.query("BEGIN");
+      const now = timestamp();
+      const existingResult = await client.query(
+        "SELECT * FROM jobs WHERE job_token = $1 LIMIT 1 FOR UPDATE",
+        [input.jobToken]
+      );
+      const mergedJob = buildPendingAsyncJobRecord(input, existingResult.rowCount ? mapJobRow(existingResult.rows[0]) : null, now);
+
+      const result = existingResult.rowCount
+        ? await client.query(
+            `
+            UPDATE jobs
+            SET
+              payment_id = $2,
+              route_id = $3,
+              service_id = $4,
+              provider = $5,
+              operation = $6,
+              buyer_wallet = $7,
+              quoted_price = $8,
+              payout_split = $9::jsonb,
+              request_id = $10,
+              provider_job_id = $11,
+              request_body = $12::jsonb,
+              route_snapshot = $13::jsonb,
+              provider_state = $14::jsonb,
+              next_poll_at = $15,
+              timeout_at = $16,
+              status = $17,
+              result_body = $18::jsonb,
+              error_message = $19,
+              refund_status = $20,
+              refund_id = $21,
+              updated_at = NOW()
+            WHERE job_token = $1
+            RETURNING *
+            `,
+            [
+              mergedJob.jobToken,
+              mergedJob.paymentId,
+              mergedJob.routeId,
+              mergedJob.serviceId,
+              mergedJob.provider,
+              mergedJob.operation,
+              mergedJob.buyerWallet,
+              mergedJob.quotedPrice,
+              JSON.stringify(mergedJob.payoutSplit),
+              mergedJob.requestId,
+              mergedJob.providerJobId,
+              JSON.stringify(mergedJob.requestBody),
+              JSON.stringify(mergedJob.routeSnapshot),
+              JSON.stringify(mergedJob.providerState ?? null),
+              mergedJob.nextPollAt,
+              mergedJob.timeoutAt,
+              mergedJob.status,
+              JSON.stringify(mergedJob.resultBody),
+              mergedJob.errorMessage,
+              mergedJob.refundStatus,
+              mergedJob.refundId
+            ]
+          )
+        : await client.query(
+            `
+            INSERT INTO jobs (
+              job_token, payment_id, route_id, service_id, provider, operation, buyer_wallet, quoted_price,
+              payout_split, request_id, provider_job_id, request_body, route_snapshot, provider_state, next_poll_at, timeout_at,
+              status, result_body, error_message, refund_status, refund_id
+            ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::jsonb, $10, $11, $12::jsonb, $13::jsonb, $14::jsonb, $15, $16, $17, $18::jsonb, $19, $20, $21)
+            RETURNING *
+            `,
+            [
+              mergedJob.jobToken,
+              mergedJob.paymentId,
+              mergedJob.routeId,
+              mergedJob.serviceId,
+              mergedJob.provider,
+              mergedJob.operation,
+              mergedJob.buyerWallet,
+              mergedJob.quotedPrice,
+              JSON.stringify(mergedJob.payoutSplit),
+              mergedJob.requestId,
+              mergedJob.providerJobId,
+              JSON.stringify(mergedJob.requestBody),
+              JSON.stringify(mergedJob.routeSnapshot),
+              JSON.stringify(mergedJob.providerState ?? null),
+              mergedJob.nextPollAt,
+              mergedJob.timeoutAt,
+              mergedJob.status,
+              JSON.stringify(mergedJob.resultBody),
+              mergedJob.errorMessage,
+              mergedJob.refundStatus,
+              mergedJob.refundId
+            ]
+          );
+
+      await client.query("COMMIT");
+      return mapJobRow(result.rows[0]);
     } catch (error) {
       await client.query("ROLLBACK");
       throw error;
@@ -7682,7 +7921,7 @@ function mapProviderPayoutInputRow(row: Record<string, unknown>): ProviderPayout
 function mapJobRow(row: Record<string, unknown>): JobRecord {
   return {
     jobToken: row.job_token as string,
-    paymentId: row.payment_id as string,
+    paymentId: (row.payment_id as string | null) ?? null,
     routeId: row.route_id as string,
     serviceId: (row.service_id as string | null) ?? null,
     provider: row.provider as string,
@@ -7691,7 +7930,7 @@ function mapJobRow(row: Record<string, unknown>): JobRecord {
     quotedPrice: row.quoted_price as string,
     payoutSplit: normalizePersistedPayoutSplit(row.payout_split as JobRecord["payoutSplit"]),
     requestId: row.request_id as string,
-    providerJobId: row.provider_job_id as string,
+    providerJobId: (row.provider_job_id as string | null) ?? null,
     requestBody: row.request_body,
     routeSnapshot: row.route_snapshot as MarketplaceRoute,
     providerState: (row.provider_state as Record<string, unknown> | null) ?? null,
