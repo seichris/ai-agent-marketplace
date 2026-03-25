@@ -49,6 +49,8 @@ export const MOCK_PROVIDER_SERVICE_SEED: ProviderServiceRecord = {
   updatedAt: SEEDED_AT
 };
 
+export const SEEDED_PROVIDER_SERVICE_IDS = [MOCK_PROVIDER_SERVICE_SEED.id];
+
 function buildQuickInsightRoute(config: MarketplaceNetworkConfig): MarketplaceRoute {
   return {
     routeId: "mock.quick-insight.v1",
@@ -191,9 +193,9 @@ function buildAsyncReportRoute(config: MarketplaceNetworkConfig): MarketplaceRou
   };
 }
 
-export const MARKETPLACE_PROVIDER_SERVICE_SEEDS: ProviderServiceRecord[] = [
-  MOCK_PROVIDER_SERVICE_SEED
-];
+function shouldSeedMarketplaceMocks(config: MarketplaceNetworkConfig): boolean {
+  return config.deploymentNetwork === "testnet";
+}
 
 function buildProviderEndpointDraft(serviceId: string, route: MarketplaceRoute): MarketplaceProviderEndpointDraftRecord {
   return {
@@ -262,6 +264,10 @@ function buildPublishedServiceVersion(input: {
 }
 
 function buildSeededServiceGroups(config: MarketplaceNetworkConfig) {
+  if (!shouldSeedMarketplaceMocks(config)) {
+    return [];
+  }
+
   const mockRoutes = [buildQuickInsightRoute(config), buildAsyncReportRoute(config)];
 
   return [
@@ -276,6 +282,14 @@ function buildSeededServiceGroups(config: MarketplaceNetworkConfig) {
     }
   ];
 }
+
+export function buildSeededProviderServices(
+  config: MarketplaceNetworkConfig = getDefaultMarketplaceNetworkConfig()
+): ProviderServiceRecord[] {
+  return buildSeededServiceGroups(config).map((group) => structuredClone(group.service));
+}
+
+export const MARKETPLACE_PROVIDER_SERVICE_SEEDS: ProviderServiceRecord[] = buildSeededProviderServices();
 
 export function buildSeededMarketplaceRoutes(
   config: MarketplaceNetworkConfig = getDefaultMarketplaceNetworkConfig()

@@ -4,12 +4,13 @@ import { Pool } from "pg";
 
 import { rawToDecimalString } from "./amounts.js";
 import { createDraftRouteBilling, normalizeRouteBilling } from "./billing.js";
-import { getDefaultMarketplaceNetworkConfig } from "./network.js";
+import { getDefaultMarketplaceNetworkConfig, type MarketplaceNetworkConfig } from "./network.js";
 import { hashProviderRuntimeKey } from "./provider-runtime.js";
 import { usesMarketplaceTreasurySettlement } from "./settlement.js";
 import {
-  MARKETPLACE_PROVIDER_SERVICE_SEEDS,
   MARKETPLACE_PROVIDER_ACCOUNT_SEED,
+  SEEDED_PROVIDER_SERVICE_IDS,
+  buildSeededProviderServices,
   buildSeededProviderEndpointDrafts,
   buildSeededPublishedEndpointVersions,
   buildSeededPublishedServiceVersions
@@ -562,8 +563,10 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
   private readonly publishedExternalEndpointsByVersionId = new Map<string, PublishedExternalEndpointVersionRecord>();
   private readonly latestSubmittedVersionByServiceId = new Map<string, string>();
   private readonly latestPublishedVersionByServiceId = new Map<string, string>();
+  private readonly networkConfig: MarketplaceNetworkConfig;
 
-  constructor() {
+  constructor(networkConfig: MarketplaceNetworkConfig = getDefaultMarketplaceNetworkConfig()) {
+    this.networkConfig = networkConfig;
     this.seedDefaults();
   }
 
@@ -572,9 +575,9 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
   }
 
   private seedDefaults() {
-    const network = getDefaultMarketplaceNetworkConfig();
+    const network = this.networkConfig;
     const account = clone(MARKETPLACE_PROVIDER_ACCOUNT_SEED);
-    const services = MARKETPLACE_PROVIDER_SERVICE_SEEDS.map((service) => clone(service));
+    const services = buildSeededProviderServices(network).map((service) => clone(service));
     const draftEndpoints = buildSeededProviderEndpointDrafts(network).map((endpoint) => clone(endpoint));
     const publishedServices = buildSeededPublishedServiceVersions(network).map((service) => clone(service));
     const publishedEndpoints = buildSeededPublishedEndpointVersions(network).map((endpoint) => clone(endpoint));
@@ -2354,7 +2357,7 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
       updatedAt: timestamp()
     };
 
-    const network = getDefaultMarketplaceNetworkConfig();
+    const network = this.networkConfig;
     const publishedEndpoints = detail.endpoints.filter(isMarketplaceEndpointDraft).map<PublishedEndpointVersionRecord>((endpoint) => ({
       endpointType: "marketplace_proxy",
       endpointVersionId: randomUUID(),
@@ -2933,7 +2936,10 @@ export class InMemoryMarketplaceStore implements MarketplaceStore {
 }
 
 export class PostgresMarketplaceStore implements MarketplaceStore {
-  constructor(private readonly pool: Pool) {}
+  constructor(
+    private readonly pool: Pool,
+    private readonly networkConfig: MarketplaceNetworkConfig = getDefaultMarketplaceNetworkConfig()
+  ) {}
 
   async ensureSchema(): Promise<void> {
     await this.pool.query(`
@@ -3768,17 +3774,23 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
   }
 
   private async seedDefaults() {
-    const network = getDefaultMarketplaceNetworkConfig();
+    const network = this.networkConfig;
     const account = MARKETPLACE_PROVIDER_ACCOUNT_SEED;
-    const services = MARKETPLACE_PROVIDER_SERVICE_SEEDS;
+    const services = buildSeededProviderServices(network);
     const draftEndpoints = buildSeededProviderEndpointDrafts(network);
     const publishedServices = buildSeededPublishedServiceVersions(network);
     const publishedEndpoints = buildSeededPublishedEndpointVersions(network);
     const publishedServiceByServiceId = new Map(publishedServices.map((service) => [service.serviceId, service]));
+    const activeSeededServiceIds = new Set(services.map((service) => service.id));
+    const staleSeededServiceIds = SEEDED_PROVIDER_SERVICE_IDS.filter((serviceId) => !activeSeededServiceIds.has(serviceId));
 
     const client = await this.pool.connect();
     try {
       await client.query("BEGIN");
+      if (staleSeededServiceIds.length > 0) {
+        await client.query("DELETE FROM provider_services WHERE id = ANY($1::text[])", [staleSeededServiceIds]);
+      }
+
       await client.query(
         `
         INSERT INTO provider_accounts (id, owner_wallet, display_name, bio, website_url, contact_email, created_at, updated_at)
@@ -6519,7 +6531,7 @@ export class PostgresMarketplaceStore implements MarketplaceStore {
       const versionTag = `v${(countResult.rows[0].count as number) + 1}`;
       const serviceVersionId = randomUUID();
       const reviewId = randomUUID();
-      const network = getDefaultMarketplaceNetworkConfig();
+      const network = this.networkConfig;
 
       await client.query(
         `

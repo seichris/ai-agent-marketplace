@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   InMemoryMarketplaceStore,
+  resolveMarketplaceNetworkConfig,
   verifyMarketplaceIdentityHeaders,
   type ProviderExecuteContext
 } from "@marketplace/shared";
@@ -60,13 +61,21 @@ async function createSiteSession(app: Express, wallet: Awaited<ReturnType<typeof
 
 async function createTestApp(
   input: {
+    deploymentNetwork?: "mainnet" | "testnet";
     store?: InMemoryMarketplaceStore;
     providers?: Parameters<typeof createMarketplaceApi>[0]["providers"];
     refundService?: Parameters<typeof createMarketplaceApi>[0]["refundService"];
   } = {}
 ) {
   const buyer = await createTestWallet();
-  const store = input.store ?? new InMemoryMarketplaceStore();
+  const deploymentNetwork = input.deploymentNetwork ?? "mainnet";
+  const networkConfig = resolveMarketplaceNetworkConfig({
+    deploymentNetwork
+  });
+  const previousNetwork = process.env.MARKETPLACE_FAST_NETWORK;
+  process.env.MARKETPLACE_FAST_NETWORK = deploymentNetwork;
+
+  const store = input.store ?? new InMemoryMarketplaceStore(networkConfig);
   const app = createMarketplaceApi({
     store,
     payTo: buyer.address,
@@ -78,7 +87,7 @@ async function createTestApp(
         return {
           isValid: true,
           payer: buyer.payerHex,
-          network: "fast-mainnet"
+          network: networkConfig.paymentNetwork
         };
       }
     },
@@ -92,6 +101,12 @@ async function createTestApp(
     providers: input.providers,
     webBaseUrl: "https://marketplace.example.com"
   });
+
+  if (previousNetwork === undefined) {
+    delete process.env.MARKETPLACE_FAST_NETWORK;
+  } else {
+    process.env.MARKETPLACE_FAST_NETWORK = previousNetwork;
+  }
 
   return {
     app,
@@ -120,7 +135,9 @@ afterEach(() => {
 
 describe("marketplace api", () => {
   it("returns catalog services and service details with generated prompts", async () => {
-    const { app } = await createTestApp();
+    const { app } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const listResponse = await request(app).get("/catalog/services");
     expect(listResponse.status).toBe(200);
@@ -136,7 +153,9 @@ describe("marketplace api", () => {
   });
 
   it("accepts public suggestions and requires an admin token for internal review", async () => {
-    const { app } = await createTestApp();
+    const { app } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const created = await request(app)
       .post("/catalog/suggestions")
@@ -175,7 +194,9 @@ describe("marketplace api", () => {
   it("lets providers list and claim request intake from their wallet session", async () => {
     const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
     const otherWallet = await createTestWallet(OTHER_PRIVATE_KEY);
-    const { app } = await createTestApp();
+    const { app } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
     const providerToken = await createSiteSession(app, providerWallet);
     const otherToken = await createSiteSession(app, otherWallet);
 
@@ -261,7 +282,9 @@ describe("marketplace api", () => {
   });
 
   it("returns 402 and payment requirements for unpaid routes", async () => {
-    const { app } = await createTestApp();
+    const { app } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const response = await request(app)
       .post("/api/mock/quick-insight")
@@ -269,7 +292,7 @@ describe("marketplace api", () => {
 
     expect(response.status).toBe(402);
     expect(response.headers["payment-required"]).toBeDefined();
-    expect(response.body.accepts[0].network).toBe("fast-mainnet");
+    expect(response.body.accepts[0].network).toBe("fast-testnet");
   });
 
   it("allows browser CORS requests from the configured web origin", async () => {
@@ -288,7 +311,9 @@ describe("marketplace api", () => {
   });
 
   it("accepts legacy X-PAYMENT on a sync route", async () => {
-    const { app, store } = await createTestApp();
+    const { app, store } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const response = await request(app)
       .post("/api/mock/quick-insight")
@@ -307,7 +332,9 @@ describe("marketplace api", () => {
   });
 
   it("replays the same sync response for the same payment id and request", async () => {
-    const { app } = await createTestApp();
+    const { app } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const first = await request(app)
       .post("/api/mock/quick-insight")
@@ -346,9 +373,14 @@ describe("marketplace api", () => {
       }
     }
 
-    const store = new FlakySyncStore();
+    const store = new FlakySyncStore(
+      resolveMarketplaceNetworkConfig({
+        deploymentNetwork: "testnet"
+      })
+    );
     const requestIds: string[] = [];
     const { app } = await createTestApp({
+      deploymentNetwork: "testnet",
       store,
       providers: {
         mock: {
@@ -449,7 +481,9 @@ describe("marketplace api", () => {
   });
 
   it("creates an async job and lets the paying wallet poll it for free", async () => {
-    const { app, buyer, store } = await createTestApp();
+    const { app, buyer, store } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const accepted = await request(app)
       .post("/api/mock/async-report")
@@ -511,9 +545,14 @@ describe("marketplace api", () => {
       }
     }
 
-    const store = new FlakyAsyncStore();
+    const store = new FlakyAsyncStore(
+      resolveMarketplaceNetworkConfig({
+        deploymentNetwork: "testnet"
+      })
+    );
     const requestIds: string[] = [];
     const { app, buyer } = await createTestApp({
+      deploymentNetwork: "testnet",
       store,
       providers: {
         mock: {
@@ -600,7 +639,9 @@ describe("marketplace api", () => {
   });
 
   it("repairs a missing async job access grant when replaying an existing payment", async () => {
-    const { app, buyer, store } = await createTestApp();
+    const { app, buyer, store } = await createTestApp({
+      deploymentNetwork: "testnet"
+    });
 
     const accepted = await request(app)
       .post("/api/mock/async-report")
@@ -669,8 +710,14 @@ describe("marketplace api", () => {
 
   it("rejects a payment proof if the facilitator verifies the wrong Fast network", async () => {
     const buyer = await createTestWallet();
+    const previousNetwork = process.env.MARKETPLACE_FAST_NETWORK;
+    process.env.MARKETPLACE_FAST_NETWORK = "testnet";
     const app = createMarketplaceApi({
-      store: new InMemoryMarketplaceStore(),
+      store: new InMemoryMarketplaceStore(
+        resolveMarketplaceNetworkConfig({
+          deploymentNetwork: "testnet"
+        })
+      ),
       payTo: buyer.address,
       sessionSecret: "test-session-secret",
       secretsKey: "test-secrets-key",
@@ -680,7 +727,7 @@ describe("marketplace api", () => {
           return {
             isValid: true,
             payer: buyer.payerHex,
-            network: "fast-testnet"
+            network: "fast-mainnet"
           };
         }
       },
@@ -691,6 +738,11 @@ describe("marketplace api", () => {
       },
       webBaseUrl: "https://marketplace.example.com"
     });
+    if (previousNetwork === undefined) {
+      delete process.env.MARKETPLACE_FAST_NETWORK;
+    } else {
+      process.env.MARKETPLACE_FAST_NETWORK = previousNetwork;
+    }
 
     const response = await request(app)
       .post("/api/mock/quick-insight")
@@ -699,7 +751,7 @@ describe("marketplace api", () => {
       .send({ query: "alpha" });
 
     expect(response.status).toBe(402);
-    expect(response.body.error).toContain("Expected fast-mainnet");
+    expect(response.body.error).toContain("Expected fast-testnet");
   });
 
   it("supports provider onboarding, review publish, and paid execution for a self-serve service", async () => {

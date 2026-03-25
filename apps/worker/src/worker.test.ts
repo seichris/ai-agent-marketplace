@@ -3,8 +3,9 @@ import { describe, expect, it } from "vitest";
 import {
   InMemoryMarketplaceStore,
   PAYMENT_EXECUTION_RECOVERY_MS,
+  buildMarketplaceRoutes,
   createDefaultProviderRegistry,
-  marketplaceRoutes
+  resolveMarketplaceNetworkConfig
 } from "@marketplace/shared";
 
 import { runMarketplaceWorkerCycle } from "./worker.js";
@@ -36,9 +37,12 @@ function buildEscrowSplit(input: {
 
 describe("marketplace worker", () => {
   it("refunds a permanently failed async job", async () => {
-    const store = new InMemoryMarketplaceStore();
+    const networkConfig = resolveMarketplaceNetworkConfig({
+      deploymentNetwork: "testnet"
+    });
+    const store = new InMemoryMarketplaceStore(networkConfig);
     const registry = createDefaultProviderRegistry();
-    const asyncRoute = marketplaceRoutes.find((route) => route.routeId === "mock.async-report.v1");
+    const asyncRoute = buildMarketplaceRoutes(networkConfig).find((route) => route.routeId === "mock.async-report.v1");
 
     const buyerWallet = "fast1x0g58phuf0pf32e9uvp3mv6hak4z37ytpqyfzjzhfsehua9kmegqwzv0td";
 
@@ -92,9 +96,12 @@ describe("marketplace worker", () => {
   });
 
   it("creates and settles grouped provider payouts for completed async jobs", async () => {
-    const store = new InMemoryMarketplaceStore();
+    const networkConfig = resolveMarketplaceNetworkConfig({
+      deploymentNetwork: "testnet"
+    });
+    const store = new InMemoryMarketplaceStore(networkConfig);
     const registry = createDefaultProviderRegistry();
-    const asyncRoute = marketplaceRoutes.find((route) => route.routeId === "mock.async-report.v1");
+    const asyncRoute = buildMarketplaceRoutes(networkConfig).find((route) => route.routeId === "mock.async-report.v1");
 
     if (!asyncRoute) {
       throw new Error("Missing async seeded route.");

@@ -13,7 +13,6 @@ import {
   createChallenge,
   hashNormalizedRequest,
   listServiceDefinitions,
-  marketplaceRoutes,
   normalizeFastWalletAddress,
   normalizePaymentHeaders,
   resolveMarketplaceNetworkConfig,
@@ -30,6 +29,11 @@ import type {
 
 const TEST_PRIVATE_KEY = "11".repeat(32);
 const TEST_TIMESTAMP = "2026-03-20T00:00:00.000Z";
+const TESTNET_NETWORK_CONFIG = resolveMarketplaceNetworkConfig({
+  deploymentNetwork: "testnet"
+});
+const TESTNET_MARKETPLACE_ROUTES = buildMarketplaceRoutes(TESTNET_NETWORK_CONFIG);
+const TESTNET_SERVICE_DEFINITIONS = listServiceDefinitions(TESTNET_NETWORK_CONFIG);
 
 async function createTestWallet() {
   const provider = new FastProvider({
@@ -125,7 +129,7 @@ describe("shared marketplace helpers", () => {
   });
 
   it("hashes normalized requests deterministically", () => {
-    const route = marketplaceRoutes[0];
+    const route = TESTNET_MARKETPLACE_ROUTES[0];
     const first = hashNormalizedRequest(route, {
       query: "alpha",
       nested: {
@@ -190,7 +194,7 @@ describe("shared marketplace helpers", () => {
     expect(second).toEqual(first);
 
     const route = {
-      ...marketplaceRoutes[0],
+      ...TESTNET_MARKETPLACE_ROUTES[0],
       routeId: "mock.lookup.v1",
       operation: "lookup",
       method: "GET" as const,
@@ -225,8 +229,8 @@ describe("shared marketplace helpers", () => {
   it("builds route entries into the OpenAPI document", () => {
     const document = buildOpenApiDocument({
       baseUrl: "http://localhost:3000",
-      services: listServiceDefinitions(),
-      routes: marketplaceRoutes
+      services: TESTNET_SERVICE_DEFINITIONS,
+      routes: TESTNET_MARKETPLACE_ROUTES
     });
     expect(document.paths["/api/mock/quick-insight"]).toBeDefined();
     expect(document.paths["/api/mock/async-report"]).toBeDefined();
@@ -249,8 +253,8 @@ describe("shared marketplace helpers", () => {
   });
 
   it("builds GET route entries into the OpenAPI document as query parameters", () => {
-    const seededService = listServiceDefinitions().find((candidate) => candidate.slug === "mock-research-signals");
-    const seededRoute = marketplaceRoutes.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
+    const seededService = TESTNET_SERVICE_DEFINITIONS.find((candidate) => candidate.slug === "mock-research-signals");
+    const seededRoute = TESTNET_MARKETPLACE_ROUTES.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
     if (!seededService || !seededRoute) {
       throw new Error("Mock seeded service is missing.");
     }
@@ -308,8 +312,8 @@ describe("shared marketplace helpers", () => {
   });
 
   it("describes free routes without x402 headers or token pricing", () => {
-    const seededService = listServiceDefinitions().find((candidate) => candidate.slug === "mock-research-signals");
-    const seededRoute = marketplaceRoutes.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
+    const seededService = TESTNET_SERVICE_DEFINITIONS.find((candidate) => candidate.slug === "mock-research-signals");
+    const seededRoute = TESTNET_MARKETPLACE_ROUTES.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
     if (!seededService || !seededRoute) {
       throw new Error("Mock seeded service is missing.");
     }
@@ -365,8 +369,8 @@ describe("shared marketplace helpers", () => {
   });
 
   it("describes prepaid-credit routes with bearer auth instead of x402 headers", () => {
-    const seededService = listServiceDefinitions().find((candidate) => candidate.slug === "mock-research-signals");
-    const seededRoute = marketplaceRoutes.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
+    const seededService = TESTNET_SERVICE_DEFINITIONS.find((candidate) => candidate.slug === "mock-research-signals");
+    const seededRoute = TESTNET_MARKETPLACE_ROUTES.find((candidate) => candidate.routeId === "mock.quick-insight.v1");
     if (!seededService || !seededRoute) {
       throw new Error("Mock seeded service is missing.");
     }
@@ -420,9 +424,18 @@ describe("shared marketplace helpers", () => {
     expect(routes[0]?.network).toBe("fast-testnet");
   });
 
+  it("does not seed mock marketplace services on mainnet", () => {
+    const mainnetConfig = resolveMarketplaceNetworkConfig({
+      deploymentNetwork: "mainnet"
+    });
+
+    expect(buildMarketplaceRoutes(mainnetConfig)).toEqual([]);
+    expect(listServiceDefinitions(mainnetConfig)).toEqual([]);
+  });
+
   it("freezes payout split amounts from the quoted price", () => {
     const split = buildPayoutSplit({
-      route: marketplaceRoutes[0],
+      route: TESTNET_MARKETPLACE_ROUTES[0],
       treasuryWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
       paymentDestinationWallet: "fast1marketplacetreasury000000000000000000000000000000000000",
       quotedPrice: "50000"
@@ -434,12 +447,12 @@ describe("shared marketplace helpers", () => {
   });
 
   it("builds service catalog summaries and prompts from the shared registry", () => {
-    const service = listServiceDefinitions().find((candidate) => candidate.slug === "mock-research-signals");
+    const service = TESTNET_SERVICE_DEFINITIONS.find((candidate) => candidate.slug === "mock-research-signals");
     if (!service) {
       throw new Error("Mock seeded service is missing.");
     }
 
-    const endpoints = marketplaceRoutes.filter((route) => service.routeIds.includes(route.routeId));
+    const endpoints = TESTNET_MARKETPLACE_ROUTES.filter((route) => service.routeIds.includes(route.routeId));
     const publishedEndpoints = endpoints.map((endpoint) => buildPublishedEndpointFromRoute(endpoint));
     const detail = buildServiceDetail({
       service,
@@ -464,7 +477,7 @@ describe("shared marketplace helpers", () => {
   });
 
   it("computes service analytics and provider request queue state in the in-memory store", async () => {
-    const store = new InMemoryMarketplaceStore();
+    const store = new InMemoryMarketplaceStore(TESTNET_NETWORK_CONFIG);
 
     await store.saveSyncIdempotency({
       paymentId: "payment_sync_catalog_1",
@@ -491,7 +504,7 @@ describe("shared marketplace helpers", () => {
       paymentId: "payment_async_catalog_1",
       normalizedRequestHash: "hash_async",
       buyerWallet: "fast1buyer00000000000000000000000000000000000000000000000000000000",
-      route: marketplaceRoutes[1],
+      route: TESTNET_MARKETPLACE_ROUTES[1],
       quotedPrice: "150000",
       payoutSplit: buildEscrowSplit({
         providerAccountId: "mock",
