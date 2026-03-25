@@ -16,15 +16,15 @@ vi.mock("next/link", () => ({
 }));
 
 describe("SiteFooter", () => {
-  it("renders the public suggestion links", () => {
+  it("renders only the social links", () => {
     render(<SiteFooter />);
 
-    expect(screen.getByRole("link", { name: "Providers" }).getAttribute("href")).toBe("/providers");
-    expect(screen.getByRole("link", { name: "Suggest an endpoint" }).getAttribute("href")).toBe(
-      "/suggest?type=endpoint"
-    );
-    expect(screen.getByRole("link", { name: "Suggest a source" }).getAttribute("href")).toBe(
-      "/suggest?type=source"
+    const links = screen.getAllByRole("link");
+
+    expect(links).toHaveLength(2);
+    expect(screen.getByRole("link", { name: "Twitter" }).getAttribute("href")).toBe("https://twitter.com/f_st");
+    expect(screen.getByRole("link", { name: "LinkedIn" }).getAttribute("href")).toBe(
+      "https://www.linkedin.com/company/f-st/"
     );
   });
 });

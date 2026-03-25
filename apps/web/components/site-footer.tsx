@@ -2,26 +2,9 @@ import React from "react";
 import Link from "next/link";
 
 export function SiteFooter() {
-  const columns = [
-    {
-      title: "Developers",
-      links: [
-        { href: "/skill.md", label: "SKILL.md" },
-        { href: "/providers", label: "Providers" }
-      ]
-    },
-    {
-      title: "Resources",
-      links: [
-        { href: "/", label: "Marketplace" },
-        { href: "/stats", label: "Stats" },
-        { href: "/suggest?type=endpoint", label: "Suggest an endpoint" }
-      ]
-    },
-    {
-      title: "Company",
-      links: [{ href: "/suggest?type=source", label: "Suggest a source" }]
-    }
+  const socialLinks = [
+    { href: "https://twitter.com/f_st", label: "Twitter" },
+    { href: "https://www.linkedin.com/company/f-st/", label: "LinkedIn" }
   ];
 
   return (
@@ -38,19 +21,21 @@ export function SiteFooter() {
             </div>
           </div>
 
-          <div className="grid gap-8 sm:grid-cols-3">
-            {columns.map((column) => (
-              <div key={column.title} className="space-y-4">
-                <div className="footer-label">{column.title}</div>
-                <nav className="flex flex-col gap-3">
-                  {column.links.map((link) => (
-                    <Link key={link.href} href={link.href} className="footer-link">
-                      {link.label}
-                    </Link>
-                  ))}
-                </nav>
-              </div>
-            ))}
+          <div className="space-y-4">
+            <div className="footer-label">Follow</div>
+            <nav className="flex flex-col gap-3 sm:max-w-xs">
+              {socialLinks.map((link) => (
+                <Link
+                  key={link.href}
+                  href={link.href}
+                  className="footer-link"
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
           </div>
         </div>
 

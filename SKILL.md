@@ -1,11 +1,18 @@
 ---
 name: fast-marketplace
-description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.example.com or api.marketplace.example.com, or manage marketplace supply from the provider/admin surfaces.
+description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.example.com or api.marketplace.example.com, or manage marketplace supply from the provider/admin surfaces. Route direct FAST SDK, AllSet bridge, hosted ramp, or generic x402 package work outside the marketplace to the main FAST skill instead.
 ---
 
 # Fast Marketplace
 
 Use this skill when a user wants to work with APIs listed on the Fast Marketplace.
+
+## Relationship to the main FAST skill
+
+- this skill is the marketplace-specific layer on top of the FAST SDK and x402 packages
+- keep this skill scoped to marketplace-hosted routes, provider workflows, and admin workflows
+- if the task is direct wallet work, bridge/ramp work, or generic x402 package integration outside marketplace routes, use the main FAST skill at `https://skill.fast.xyz/skill.md`
+- marketplace v1 is Fast-only; do not broaden this skill into generic EVM or non-marketplace API monetization guidance
 
 ## Use this skill when
 
@@ -24,6 +31,9 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 
 ## Do not use this skill when
 
+- the user wants direct `@fastxyz/sdk` wallet, balance, send, signature, or token-info work outside the marketplace
+- the user wants Fast <-> EVM bridge flows, hosted ramp flows, or `@fastxyz/allset-sdk` guidance
+- the user wants generic `@fastxyz/x402-client`, `@fastxyz/x402-server`, or `@fastxyz/x402-facilitator` integration outside marketplace routes
 - the user wants a direct provider integration outside the marketplace
 - the task is generic web research rather than using marketplace routes
 
@@ -40,6 +50,7 @@ Before acting, identify:
 - whether they want browser login only, browser execution, or a CLI/agent-wallet flow
 - whether they already have a funded Fast wallet
 - which Fast network the deployment is using: mainnet or testnet
+- which settlement token the published marketplace route expects for that deployment; marketplace deployments currently use `fastUSDC` on mainnet and `testUSDC` on testnet
 - whether they need website session auth, API-scoped wallet session auth, job retrieval auth, or admin token auth
 - for provider flows: service metadata, payout wallet, website URL, endpoint schemas/examples, and upstream execution details
 
@@ -72,7 +83,7 @@ The marketplace is Fast-native and wallet-first.
 
 ### Fixed x402
 
-1. Use a persistent local Fast wallet funded with `fastUSDC` on mainnet or `testUSDC` on testnet.
+1. Use a persistent local Fast wallet funded with the settlement token shown by the published marketplace route. Marketplace deployments currently use `fastUSDC` on mainnet and `testUSDC` on testnet.
 2. Send the first request without payment proof.
 3. Read the `402` response and payment requirements.
 4. Authorize payment from the wallet.
@@ -99,10 +110,13 @@ Important constraints:
 - website login uses a signed wallet challenge for the site session
 - the website can also pay and execute routes directly through the Fast extension
 - wallet identity is the payer identity
+- this skill is for trusted marketplace hosts, not arbitrary third-party `402` origins
 - use the same request body when retrying a payable route
 - for safe retries, keep the same payment identifier for the same normalized request only
 - prepaid-credit routes require funded service credit and wallet-session bearer auth instead of per-call x402
 - Community/direct services still use verified provider onboarding and domain verification; the difference is money flow, not trust requirements
+- marketplace v1 is Fast-only; do not invent AllSet bridge, hosted ramp, or generic EVM payment steps from this skill
+- if the user needs direct SDK or package-level guidance instead of marketplace route execution, hand off to the main FAST skill
 
 ## Website auth flow
 
@@ -192,6 +206,7 @@ Important provider constraints:
 
 - Marketplace UI: `https://marketplace.example.com`
 - Canonical skill: `https://marketplace.example.com/skill.md`
+- Main FAST skill: `https://skill.fast.xyz/skill.md`
 - Suggest an endpoint: `https://marketplace.example.com/suggest?type=endpoint`
 - Suggest a source: `https://marketplace.example.com/suggest?type=source`
 - Provider dashboard: `https://marketplace.example.com/providers`
