@@ -17,6 +17,7 @@ import type {
   UpdateProviderServiceInput
 } from "@marketplace/shared";
 import { clearStoredWalletSession } from "@/lib/wallet-session";
+import { getServerApiBaseUrl } from "@/lib/api-base-url";
 
 export interface ProviderRuntimeKeySummary {
   id: string;
@@ -26,7 +27,7 @@ export interface ProviderRuntimeKeySummary {
 }
 
 function getApiBaseUrl(): string {
-  return process.env.MARKETPLACE_API_BASE_URL ?? "http://localhost:3000";
+  return getServerApiBaseUrl();
 }
 
 function getAdminToken(): string {
