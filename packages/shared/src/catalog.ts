@@ -195,7 +195,7 @@ function buildMarketplaceUseThisServicePrompt(input: {
   if (input.endpoints.some((endpoint) => endpoint.billingType === "free" && endpoint.mode === "async")) {
     lines.push(
       "",
-      "For free async endpoints: create a route-scoped wallet session first, then invoke the route with the bearer token and retrieve the job with GET /api/jobs/{jobToken}."
+      "For free async endpoints: create a route-scoped wallet session first, invoke the route with the bearer token, then create a job-scoped wallet session and poll GET /api/jobs/{jobToken} with Authorization: Bearer <accessToken>."
     );
   }
 

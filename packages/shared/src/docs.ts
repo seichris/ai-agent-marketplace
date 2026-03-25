@@ -388,8 +388,8 @@ export function buildLlmsTxt(input: {
     `Marketplace catalog: ${baseUrl}/catalog/services`,
     "Payment protocol for paid trigger routes: x402 over HTTP",
     `Payment headers for x402 routes: ${PAYMENT_REQUIRED_HEADER}, ${PAYMENT_SIGNATURE_HEADER}, ${PAYMENT_RESPONSE_HEADER}`,
-    "Repeat retrieval auth: wallet challenge session",
-    "Marketplace skill: serve from the public web app at /skill.md",
+    "Repeat retrieval auth: wallet challenge session with a Bearer access token scoped to the route or job resource",
+    `Marketplace skill: ${baseUrl}/skill.md`,
     "",
     "## Marketplace Services"
   ];
@@ -480,7 +480,11 @@ export function buildLlmsTxt(input: {
     );
   }
 
-  lines.push("", "## Free Retrieval", "- GET /api/jobs/{jobToken} with a wallet-bound bearer token");
+  lines.push(
+    "",
+    "## Free Retrieval",
+    "- GET /api/jobs/{jobToken} with Authorization: Bearer <accessToken> from a job-scoped wallet challenge session"
+  );
 
   return lines.join("\n");
 }

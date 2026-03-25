@@ -86,7 +86,7 @@ For `verified_escrow`, successful route charges and top-ups create provider payo
 ### Agent User
 
 - Discovers services through catalog pages, `llms.txt`, and `.well-known/marketplace.json`
-- Uses marketplace execution prompts and `skill.md` for marketplace-hosted services
+- Uses marketplace execution prompts and `SKILL.md` for marketplace-hosted services
 - Calls marketplace routes when the service is executable by the marketplace
 - Uses direct-integration prompts for external services instead
 - Calls the provider directly for discovery-only external services
@@ -139,7 +139,7 @@ Optional frontend variables:
 export MARKETPLACE_API_BASE_URL=http://localhost:3000
 ```
 
-`MARKETPLACE_FAST_NETWORK` supports `mainnet` or `testnet`. The deployment token is `USDC` on mainnet and `testUSDC` on testnet.
+`MARKETPLACE_FAST_NETWORK` supports `mainnet` or `testnet`. Marketplace routes use `USDC` on mainnet and `testUSDC` on testnet. For paid calls, treat the `402` response `accepts[*].asset` field as authoritative over any nickname.
 
 3. Run the facilitator:
 
@@ -186,6 +186,8 @@ npm run cli -- wallet address
 npm run cli -- invoke mock quick-insight --body '{"query":"alpha"}'
 ```
 
+The CLI currently uses `@fastxyz/x402-client@^0.1.2` and calls `x402Pay` for payable routes.
+
 For prepaid-credit routes, and for async free routes that require wallet-session auth, the CLI can mint an API-scoped wallet session automatically when the route responds with auth requirements instead of `402`. You can also create that session explicitly:
 
 ```bash
@@ -193,6 +195,8 @@ npm run cli -- auth api-session <provider> <operation>
 ```
 
 For provider-authored top-up routes, call the route with an amount in the request body. For prepaid-credit routes, fund credit first, then call the prepaid route with the same `invoke` command; the CLI will switch to wallet-session auth when needed. Async free routes also use wallet-session auth and return a `jobToken` for `GET /api/jobs/:jobToken`.
+
+Async retrieval uses a second wallet challenge flow scoped to the `jobToken`. Poll `GET /api/jobs/:jobToken` with `Authorization: Bearer <accessToken>` from the same wallet that paid for or authorized the original trigger. The default poll interval is `5000` ms.
 
 Provider-agent workflow:
 
@@ -245,8 +249,8 @@ MARKETPLACE_SESSION_SECRET=change-me
 MARKETPLACE_ADMIN_TOKEN=change-me-too
 MARKETPLACE_SECRETS_KEY=change-me-again
 MARKETPLACE_FAST_NETWORK=mainnet
-MARKETPLACE_BASE_URL=https://fastapi.example.com
-MARKETPLACE_WEB_BASE_URL=https://fast.example.com
+MARKETPLACE_BASE_URL=https://fastapi.8o.vc
+MARKETPLACE_WEB_BASE_URL=https://marketplace.fast.xyz
 PORT=3000
 ```
 
@@ -277,8 +281,8 @@ FACILITATOR_FAST_RPC_URL=https://api.fast.xyz/proxy
 Required web environment:
 
 ```bash
-MARKETPLACE_API_BASE_URL=https://fastapi.example.com
-MARKETPLACE_WEB_BASE_URL=https://fast.example.com
+MARKETPLACE_API_BASE_URL=https://fastapi.8o.vc
+MARKETPLACE_WEB_BASE_URL=https://marketplace.fast.xyz
 MARKETPLACE_ADMIN_TOKEN=change-me-too
 MARKETPLACE_FAST_NETWORK=mainnet
 PORT=3000
