@@ -45,7 +45,7 @@ export function MarketplaceHome({ services }: { services: ServiceSummary[] }) {
             <Badge variant="eyebrow">Go Fast</Badge>
             <div className="space-y-6">
               <h1 className="page-title">
-                Data APIs for agents
+                APIs for agents
                 <span
                   className="ml-3 inline-block h-[0.9em] w-3 rounded-pill bg-foreground align-[-0.1em]"
                   style={{ animation: "blink 1.2s infinite" }}
