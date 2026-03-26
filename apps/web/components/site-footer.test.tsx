@@ -22,9 +22,10 @@ describe("SiteFooter", () => {
     const links = screen.getAllByRole("link");
 
     expect(links).toHaveLength(2);
-    expect(screen.getByRole("link", { name: "Twitter" }).getAttribute("href")).toBe("https://twitter.com/f_st");
+    expect(screen.getByText("Socials")).toBeTruthy();
+    expect(screen.getByRole("link", { name: "X.com" }).getAttribute("href")).toBe("https://x.com/pi2_labs");
     expect(screen.getByRole("link", { name: "LinkedIn" }).getAttribute("href")).toBe(
-      "https://www.linkedin.com/company/f-st/"
+      "https://www.linkedin.com/company/fast-xyz"
     );
   });
 });

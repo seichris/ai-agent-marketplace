@@ -3,8 +3,8 @@ import Link from "next/link";
 
 export function SiteFooter() {
   const socialLinks = [
-    { href: "https://twitter.com/f_st", label: "Twitter" },
-    { href: "https://www.linkedin.com/company/f-st/", label: "LinkedIn" }
+    { href: "https://x.com/pi2_labs", label: "X.com" },
+    { href: "https://www.linkedin.com/company/fast-xyz", label: "LinkedIn" }
   ];
 
   return (
@@ -22,7 +22,7 @@ export function SiteFooter() {
           </div>
 
           <div className="space-y-4">
-            <div className="footer-label">Follow</div>
+            <div className="footer-label">Socials</div>
             <nav className="flex flex-col gap-3 sm:max-w-xs">
               {socialLinks.map((link) => (
                 <Link
