@@ -1,0 +1,34 @@
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+      day: monday
+      time: "03:00"
+    open-pull-requests-limit: 10
+    versioning-strategy: increase-if-necessary
+    rebase-strategy: auto
+    commit-message:
+      prefix: "chore"
+    ignore:
+      - dependency-name: "@fastxyz/*"
+    groups:
+      workspace-non-fast:
+        patterns:
+          - "*"
+        exclude-patterns:
+          - "@fastxyz/*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+      day: monday
+      time: "04:00"
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: "chore"
