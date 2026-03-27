@@ -36,8 +36,8 @@
     "@fastxyz/x402-client": "^0.1.2",
     "@fastxyz/x402-facilitator": "^0.1.2",
     "@fastxyz/x402-server": "^0.1.2",
-    "@noble/ed25519": "^2.3.0",
-    "@noble/hashes": "^1.8.0",
+    "@noble/ed25519": "^3.0.1",
+    "@noble/hashes": "^2.0.1",
     "ajv": "^8.18.0",
     "commander": "^14.0.3",
     "dotenv": "^17.3.1",
@@ -48,7 +48,9 @@
   },
   "optionalDependencies": {
     "@next/swc-linux-x64-gnu": "^16.1.7",
-    "@rollup/rollup-linux-x64-gnu": "^4.59.0"
+    "@rollup/rollup-linux-x64-gnu": "^4.59.0",
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.2.2",
+    "lightningcss-linux-x64-gnu": "^1.32.0"
   },
   "devDependencies": {
     "@playwright/test": "^1.54.2",
