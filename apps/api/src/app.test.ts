@@ -4829,6 +4829,7 @@ describe("marketplace api", () => {
     expect(fetchMock).toHaveBeenCalledWith(
       "https://docs.provider.example.com/openapi.json",
       expect.objectContaining({
+        redirect: "manual",
         headers: {
           accept: "application/json"
         }
@@ -4853,5 +4854,63 @@ describe("marketplace api", () => {
       upstreamAuthMode: "none"
     });
     expect(response.body.warnings).toEqual([]);
+  });
+
+  it("rejects OpenAPI import redirects to unsafe hosts", async () => {
+    const providerWallet = await createTestWallet(PROVIDER_PRIVATE_KEY);
+    const { app } = await createTestApp();
+    const providerToken = await createSiteSession(app, providerWallet);
+
+    await request(app)
+      .post("/provider/me")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        displayName: "Signal Labs",
+        websiteUrl: "https://provider.example.com"
+      });
+
+    const createdService = await request(app)
+      .post("/provider/services")
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        serviceType: "marketplace_proxy",
+        slug: "signal-import-redirect",
+        apiNamespace: "signal-import-redirect",
+        name: "Signal Import Redirect",
+        tagline: "Short-form market signals",
+        about: "Provider-authored signal endpoints.",
+        categories: ["Research"],
+        promptIntro: "Prompt intro",
+        setupInstructions: ["Use a funded Fast wallet."],
+        websiteUrl: "https://provider.example.com",
+        payoutWallet: providerWallet.address
+      });
+
+    expect(createdService.status).toBe(201);
+
+    const fetchMock = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: {
+          location: "https://127.0.0.1/internal-openapi.json"
+        }
+      })
+    );
+
+    const response = await request(app)
+      .post(`/provider/services/${createdService.body.service.id}/openapi/import`)
+      .set("Authorization", `Bearer ${providerToken}`)
+      .send({
+        documentUrl: "https://docs.provider.example.com/openapi.json"
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error).toContain("Only public HTTPS URLs are supported");
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://docs.provider.example.com/openapi.json",
+      expect.objectContaining({
+        redirect: "manual"
+      })
+    );
   });
 });

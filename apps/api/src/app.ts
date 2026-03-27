@@ -117,6 +117,8 @@ type RawBodyRequest = Request & {
   rawBody?: Buffer;
 };
 
+class UnsafePublicUrlError extends Error {}
+
 const suggestionCreateSchema = z
   .object({
     type: z.enum(["endpoint", "source"]),
@@ -1219,13 +1221,26 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
     }
 
     let importResponse: globalThis.Response;
+    let importDocumentUrl: string;
     try {
-      importResponse = await fetch(parsed.data.documentUrl, {
-        headers: {
-          accept: "application/json"
-        }
+      const result = await fetchSafePublicHttpsUrl({
+        url: parsed.data.documentUrl,
+        init: {
+          headers: {
+            accept: "application/json"
+          }
+        },
+        validateUrl(url) {
+          return isSameOrSubdomain(serviceHost, url.hostname);
+        },
+        invalidRedirectMessage: "OpenAPI document redirects must stay on the service website host or one of its subdomains."
       });
+      importResponse = result.response;
+      importDocumentUrl = result.finalUrl;
     } catch (error) {
+      if (error instanceof UnsafePublicUrlError) {
+        return res.status(400).json({ error: error.message });
+      }
       return res.status(502).json({
         error: error instanceof Error ? error.message : "OpenAPI document fetch failed."
       });
@@ -1234,13 +1249,6 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
     if (!importResponse.ok) {
       return res.status(502).json({
         error: `OpenAPI document fetch failed with status ${importResponse.status}.`
-      });
-    }
-
-    const finalDocumentHost = new URL(importResponse.url || parsed.data.documentUrl).hostname;
-    if (!isSameOrSubdomain(serviceHost, finalDocumentHost)) {
-      return res.status(400).json({
-        error: "OpenAPI document redirects must stay on the service website host or one of its subdomains."
       });
     }
 
@@ -1257,7 +1265,7 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
     try {
       preview = parseOpenApiImportDocument({
         document,
-        documentUrl: importResponse.url || parsed.data.documentUrl
+        documentUrl: importDocumentUrl
       });
     } catch (error) {
       return res.status(400).json({
@@ -1347,7 +1355,13 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
     const expectedUrl = `https://${serviceHost}/.well-known/fast-marketplace-verification.txt`;
 
     try {
-      const verificationResponse = await fetch(expectedUrl);
+      const { response: verificationResponse } = await fetchSafePublicHttpsUrl({
+        url: expectedUrl,
+        validateUrl(url) {
+          return url.host === serviceHost;
+        },
+        invalidRedirectMessage: "Verification redirects must stay on the verified website host."
+      });
       const body = (await verificationResponse.text()).trim();
       if (!verificationResponse.ok || body !== latestVerification.token) {
         const updated = await options.store.markProviderVerificationResult(req.params.id, "failed", {
@@ -1365,6 +1379,15 @@ export function createMarketplaceApi(options: MarketplaceApiOptions): Express {
       });
       return res.json(updated);
     } catch (error) {
+      if (error instanceof UnsafePublicUrlError) {
+        const updated = await options.store.markProviderVerificationResult(req.params.id, "failed", {
+          failureReason: error.message
+        });
+        return res.status(400).json({
+          error: error.message,
+          verification: updated
+        });
+      }
       const updated = await options.store.markProviderVerificationResult(req.params.id, "failed", {
         failureReason: error instanceof Error ? error.message : "Verification request failed."
       });
@@ -3631,6 +3654,54 @@ function websiteHostChanged(previousUrl: string | null, nextUrl: string | null):
   }
 
   return new URL(previousUrl).host !== new URL(nextUrl).host;
+}
+
+async function fetchSafePublicHttpsUrl(input: {
+  url: string;
+  init?: RequestInit;
+  validateUrl?: (url: URL) => boolean;
+  invalidRedirectMessage: string;
+  maxRedirects?: number;
+}): Promise<{ response: globalThis.Response; finalUrl: string }> {
+  let currentUrl = new URL(input.url);
+  const maxRedirects = input.maxRedirects ?? 5;
+
+  for (let redirects = 0; redirects <= maxRedirects; redirects += 1) {
+    if (!isSafePublicHttpsUrl(currentUrl.toString())) {
+      throw new UnsafePublicUrlError("Only public HTTPS URLs are supported.");
+    }
+    if (input.validateUrl && !input.validateUrl(currentUrl)) {
+      throw new UnsafePublicUrlError(input.invalidRedirectMessage);
+    }
+
+    const response = await fetch(currentUrl.toString(), {
+      ...input.init,
+      redirect: "manual"
+    });
+    if (!isRedirectStatusCode(response.status)) {
+      return {
+        response,
+        finalUrl: currentUrl.toString()
+      };
+    }
+
+    if (redirects >= maxRedirects) {
+      throw new UnsafePublicUrlError("Too many redirects.");
+    }
+
+    const location = response.headers.get("location");
+    if (!location) {
+      throw new UnsafePublicUrlError("Redirect response was missing a Location header.");
+    }
+
+    currentUrl = new URL(location, currentUrl);
+  }
+
+  throw new UnsafePublicUrlError("Too many redirects.");
+}
+
+function isRedirectStatusCode(status: number): boolean {
+  return status === 301 || status === 302 || status === 303 || status === 307 || status === 308;
 }
 
 function isSafePublicHttpsUrl(value: string): boolean {
