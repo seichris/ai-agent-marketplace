@@ -177,53 +177,83 @@ export function createFastPayMcpServer(
   config: FastPayMcpConfig,
   deps: CliDependencies = createFastPayMcpCliDependencies()
 ) {
+  const marketplaceSearchInputSchema: Record<string, z.ZodTypeAny> = {
+    q: z.string().optional(),
+    category: z.string().optional(),
+    billingType: z.enum(["fixed_x402", "topup_x402_variable", "prepaid_credit", "free"]).optional(),
+    mode: z.enum(["sync", "async"]).optional(),
+    settlementMode: z.enum(["verified_escrow"]).optional(),
+    limit: z.number().int().min(1).max(100).optional()
+  };
+  const marketplaceShowInputSchema: Record<string, z.ZodTypeAny> = {
+    ref: z.string()
+  };
+  const marketplaceCallInputSchema: Record<string, z.ZodTypeAny> = {
+    ref: z.string(),
+    input: z.unknown()
+  };
+  const marketplaceTopupInputSchema: Record<string, z.ZodTypeAny> = {
+    ref: z.string(),
+    amount: z.string()
+  };
+  const marketplaceGetJobInputSchema: Record<string, z.ZodTypeAny> = {
+    jobToken: z.string()
+  };
   const server = new McpServer({
     name: "fast-pay-mcp",
     version: "0.1.0"
   });
   const handlers = createFastPayMcpHandlers(config, deps);
+  const registerTool = server.registerTool.bind(server) as (
+    name: string,
+    config: {
+      description: string;
+      inputSchema?: Record<string, z.ZodTypeAny>;
+    },
+    cb: (input: unknown) => Promise<ReturnType<typeof createToolResult>>
+  ) => void;
 
-  server.registerTool("marketplace_search", {
+  registerTool("marketplace_search", {
     description: "Search Fast marketplace services and executable routes.",
-    inputSchema: {
-      q: z.string().optional(),
-      category: z.string().optional(),
-      billingType: z.enum(["fixed_x402", "topup_x402_variable", "prepaid_credit", "free"]).optional(),
-      mode: z.enum(["sync", "async"]).optional(),
-      settlementMode: z.enum(["verified_escrow"]).optional(),
-      limit: z.number().int().min(1).max(100).optional()
-    }
-  }, async (input) => createToolResult(await handlers.marketplaceSearch(input)));
+    inputSchema: marketplaceSearchInputSchema
+  }, async (input) => createToolResult(await handlers.marketplaceSearch(input as {
+    q?: string;
+    category?: string;
+    billingType?: "fixed_x402" | "topup_x402_variable" | "prepaid_credit" | "free";
+    mode?: "sync" | "async";
+    settlementMode?: "verified_escrow";
+    limit?: number;
+  })));
 
-  server.registerTool("marketplace_show", {
+  registerTool("marketplace_show", {
     description: "Get one marketplace service or route by slug or route ref.",
-    inputSchema: {
-      ref: z.string()
-    }
-  }, async (input) => createToolResult(await handlers.marketplaceShow(input)));
+    inputSchema: marketplaceShowInputSchema
+  }, async (input) => createToolResult(await handlers.marketplaceShow(input as {
+    ref: string;
+  })));
 
-  server.registerTool("marketplace_call", {
+  registerTool("marketplace_call", {
     description: "Invoke one Fast marketplace route using x402 or wallet-session auth.",
-    inputSchema: {
-      ref: z.string(),
-      input: z.unknown()
-    }
-  }, async (input) => createToolResult(await handlers.marketplaceCall(input)));
+    inputSchema: marketplaceCallInputSchema
+  }, async (input) => createToolResult(await handlers.marketplaceCall(input as {
+    ref: string;
+    input: unknown;
+  })));
 
-  server.registerTool("marketplace_topup", {
+  registerTool("marketplace_topup", {
     description: "Execute a variable-amount marketplace top-up route.",
-    inputSchema: {
-      ref: z.string(),
-      amount: z.string()
-    }
-  }, async (input) => createToolResult(await handlers.marketplaceTopup(input)));
+    inputSchema: marketplaceTopupInputSchema
+  }, async (input) => createToolResult(await handlers.marketplaceTopup(input as {
+    ref: string;
+    amount: string;
+  })));
 
-  server.registerTool("marketplace_get_job", {
+  registerTool("marketplace_get_job", {
     description: "Fetch an async marketplace job result for the configured wallet.",
-    inputSchema: {
-      jobToken: z.string()
-    }
-  }, async (input) => createToolResult(await handlers.marketplaceGetJob(input)));
+    inputSchema: marketplaceGetJobInputSchema
+  }, async (input) => createToolResult(await handlers.marketplaceGetJob(input as {
+    jobToken: string;
+  })));
 
   return server;
 }
