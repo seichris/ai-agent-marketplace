@@ -8,6 +8,7 @@ COPY apps/facilitator/package.json apps/facilitator/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/cli/package.json packages/cli/package.json
+COPY packages/mcp/package.json packages/mcp/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci
@@ -28,6 +29,7 @@ COPY apps/facilitator/package.json apps/facilitator/package.json
 COPY apps/web/package.json apps/web/package.json
 COPY apps/worker/package.json apps/worker/package.json
 COPY packages/cli/package.json packages/cli/package.json
+COPY packages/mcp/package.json packages/mcp/package.json
 COPY packages/shared/package.json packages/shared/package.json
 
 RUN npm ci --omit=dev

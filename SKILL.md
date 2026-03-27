@@ -1,6 +1,6 @@
 ---
 name: fast-marketplace
-description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.fast.xyz or fastapi.8o.vc, or manage marketplace supply from the provider/admin surfaces. Route direct FAST SDK, AllSet bridge, hosted ramp, or generic x402 package work outside the marketplace to the main FAST skill instead.
+description: Discover services on the Fast Marketplace, choose the right endpoint, follow Community/direct or Verified/escrow payment flows, use fixed-price x402, variable top-up, or prepaid-credit routes with a funded local wallet, handle async job retrieval, onboard providers, manage draft services, rotate provider runtime keys, review marketplace demand intake, and submit or review marketplace supply. Use this when a user wants to browse or call APIs exposed through marketplace.fast.xyz or api.marketplace.fast.xyz, or manage marketplace supply from the provider/admin surfaces. Route direct FAST SDK, AllSet bridge, hosted ramp, or generic x402 package work outside the marketplace to the main FAST skill instead.
 ---
 
 # Fast Marketplace
@@ -13,7 +13,7 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 - keep this skill scoped to marketplace-hosted routes, provider workflows, and admin workflows
 - if the task is direct wallet work, bridge/ramp work, or generic x402 package integration outside marketplace routes, use the main FAST skill at `https://skill.fast.xyz/skill.md`
 - marketplace v1 is Fast-only; do not broaden this skill into generic EVM or non-marketplace API monetization guidance
-- the canonical public hosts are `https://marketplace.fast.xyz` for the web app and `https://fastapi.8o.vc` for the API; non-production deployments may rewrite these URLs when serving `/skill.md`
+- the canonical public hosts are `https://marketplace.fast.xyz` for the web app and `https://api.marketplace.fast.xyz` for the API; non-production deployments may rewrite these URLs when serving `/skill.md`
 
 ## Use this skill when
 
@@ -22,6 +22,7 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 - the user wants to sign into `https://marketplace.fast.xyz` with a Fast browser wallet
 - the user wants to pay and execute a marketplace route directly from the website with the Fast browser extension
 - the user needs to call a fixed-price x402 route, a variable top-up route, or a prepaid-credit route with a local Fast wallet
+- the user wants to connect the marketplace to an MCP-capable agent client with a local stdio MCP server
 - the user needs to retrieve an async result from a previously accepted job
 - the user wants to suggest a missing endpoint or a new source/webservice for providers to build
 - the user wants to create or update a provider profile and manage service drafts
@@ -37,6 +38,7 @@ Use this skill when a user wants to work with APIs listed on the Fast Marketplac
 - the user wants generic `@fastxyz/x402-client`, `@fastxyz/x402-server`, or `@fastxyz/x402-facilitator` integration outside marketplace routes
 - the user wants a direct provider integration outside the marketplace
 - the task is generic web research rather than using marketplace routes
+- the user wants a hosted MCP service; the marketplace MCP integration is local stdio in v1
 
 ## Inputs to gather
 
@@ -81,11 +83,53 @@ Provider env example:
 
 ```bash
 AGENT_WALLET_KEY=<fast private key hex>
-MARKETPLACE_API_BASE_URL=https://fastapi.8o.vc
+MARKETPLACE_API_BASE_URL=https://api.marketplace.fast.xyz
 MARKETPLACE_FAST_NETWORK=mainnet
 ```
 
 The current provider CLI is this workspace itself. Do not point users at a separate toolkit unless one is explicitly published.
+
+## Local MCP setup
+
+The marketplace MCP integration is local stdio in v1, not a hosted remote MCP service.
+
+- the user runs `fast-pay-mcp` locally from their own environment
+- the MCP server calls the hosted marketplace API
+- payment signing still happens from the user's Fast wallet via `FAST_PRIVATE_KEY` or `FAST_KEYFILE_PATH`
+- do not describe this as a hosted marketplace service
+
+Typical environment:
+
+```bash
+export MARKETPLACE_API_BASE_URL=https://api.marketplace.fast.xyz
+export MARKETPLACE_FAST_NETWORK=mainnet
+export FAST_PRIVATE_KEY=<32-byte-hex-private-key>
+```
+
+Typical MCP config:
+
+```json
+{
+  "mcpServers": {
+    "fast-pay": {
+      "command": "fast-pay-mcp",
+      "env": {
+        "MARKETPLACE_API_BASE_URL": "https://api.marketplace.fast.xyz",
+        "MARKETPLACE_FAST_NETWORK": "mainnet",
+        "FAST_PRIVATE_KEY": "<private key hex>"
+      }
+    }
+  }
+}
+```
+
+The v1 MCP tool surface is:
+
+- `marketplace_search`
+- `marketplace_show`
+- `marketplace_call`
+- `marketplace_topup`
+- `marketplace_get_job`
 
 ## Concrete buyer call patterns
 
@@ -113,7 +157,7 @@ Use the marketplace contract directly instead of inferring missing details.
 import { x402Pay } from "@fastxyz/x402-client";
 
 const result = await x402Pay({
-  url: "https://fastapi.8o.vc/api/orders/place-order",
+  url: "https://api.marketplace.fast.xyz/api/orders/place-order",
   method: "POST",
   body: JSON.stringify({ sku: "abc", quantity: 1 }),
   headers: {
@@ -141,7 +185,7 @@ Notes:
 Use route-scoped bearer auth for `prepaid_credit` and async free routes.
 
 ```ts
-const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
+const challenge = await fetch("https://api.marketplace.fast.xyz/auth/challenge", {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
@@ -153,7 +197,7 @@ const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
 
 const signed = await connector.sign({ message: challenge.message });
 
-const session = await fetch("https://fastapi.8o.vc/auth/session", {
+const session = await fetch("https://api.marketplace.fast.xyz/auth/session", {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
@@ -166,7 +210,7 @@ const session = await fetch("https://fastapi.8o.vc/auth/session", {
   })
 }).then((response) => response.json());
 
-const apiResponse = await fetch("https://fastapi.8o.vc/api/orders/place-order", {
+const apiResponse = await fetch("https://api.marketplace.fast.xyz/api/orders/place-order", {
   method: "POST",
   headers: {
     "content-type": "application/json",
@@ -194,7 +238,7 @@ The challenge response shape is:
 If a trigger returns `202`, save the `jobToken`, mint a job-scoped bearer token, then poll the job endpoint.
 
 ```ts
-const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
+const challenge = await fetch("https://api.marketplace.fast.xyz/auth/challenge", {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
@@ -206,7 +250,7 @@ const challenge = await fetch("https://fastapi.8o.vc/auth/challenge", {
 
 const signed = await connector.sign({ message: challenge.message });
 
-const session = await fetch("https://fastapi.8o.vc/auth/session", {
+const session = await fetch("https://api.marketplace.fast.xyz/auth/session", {
   method: "POST",
   headers: { "content-type": "application/json" },
   body: JSON.stringify({
@@ -219,7 +263,7 @@ const session = await fetch("https://fastapi.8o.vc/auth/session", {
   })
 }).then((response) => response.json());
 
-const job = await fetch("https://fastapi.8o.vc/api/jobs/job_123", {
+const job = await fetch("https://api.marketplace.fast.xyz/api/jobs/job_123", {
   headers: {
     authorization: `Bearer ${session.accessToken}`
   }
@@ -490,7 +534,7 @@ Example top-up billing:
 - provider dashboard: `https://marketplace.fast.xyz/providers`
 - provider onboarding: `https://marketplace.fast.xyz/providers/onboard`
 - provider services: `https://marketplace.fast.xyz/providers/services`
-- marketplace OpenAPI, including provider endpoints: `https://fastapi.8o.vc/openapi.json`
+- marketplace OpenAPI, including provider endpoints: `https://api.marketplace.fast.xyz/openapi.json`
 
 Important provider constraints:
 
@@ -544,9 +588,9 @@ Important provider constraints:
 - Admin provider services: `https://marketplace.fast.xyz/admin/services`
 - Admin suggestions: `https://marketplace.fast.xyz/admin/suggestions`
 - Website wallet login: use the `Connect Wallet` control in the site header
-- OpenAPI: `https://fastapi.8o.vc/openapi.json`
-- LLM summary: `https://fastapi.8o.vc/llms.txt`
-- Marketplace catalog JSON: `https://fastapi.8o.vc/.well-known/marketplace.json`
+- OpenAPI: `https://api.marketplace.fast.xyz/openapi.json`
+- LLM summary: `https://api.marketplace.fast.xyz/llms.txt`
+- Marketplace catalog JSON: `https://api.marketplace.fast.xyz/.well-known/marketplace.json`
 
 ## Example requests that should trigger this skill
 
