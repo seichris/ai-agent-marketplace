@@ -64,9 +64,9 @@ describe("MarketplaceHome", () => {
     );
 
     expect(screen.getByRole("heading", { name: "APIs for agents" })).toBeTruthy();
-    expect(screen.queryByText("Explore marketplace")).toBeNull();
-    expect(screen.queryByText("Suggest supply")).toBeNull();
-    expect(screen.queryByText("FAST-native supply snapshot")).toBeNull();
+    expect(screen.getByRole("table")).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /service/i })).toBeTruthy();
+    expect(screen.getByRole("columnheader", { name: /pricing/i })).toBeTruthy();
     expect(screen.getByText("Mock Research Signals")).toBeTruthy();
     expect(screen.getByText("Weather Wire")).toBeTruthy();
 

@@ -44,10 +44,7 @@ export function SiteHeader({
   );
 
   return (
-    <header
-      className="sticky top-0 z-[100] border-b border-border bg-background/85"
-      style={{ backdropFilter: "blur(16px)" }}
-    >
+    <header className="sticky top-0 z-[100] border-b border-border bg-background/85">
       <div className="nav-shell">
         <Link href="/" aria-label="Fast Marketplace" className="flex shrink-0 items-center">
           <img
