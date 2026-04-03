@@ -6,7 +6,7 @@ const projectUuid = "eo0w0w04s4g8osgo4oocg84w";
 const repo = "https://github.com/seichris/ai-agent-marketplace.git";
 const branch = process.env.APIFY_ROLLOUT_BRANCH
   ?? (execFileSync("git", ["branch", "--show-current"], { cwd, encoding: "utf8" }).trim() || "main");
-const sharedBuild = "npm install && npm run build";
+const sharedBuild = "npm install && npm run build:runtime";
 const sharedStart = "npm run start:apify-service";
 const healthPath = "/health";
 
@@ -336,7 +336,7 @@ for (const entry of apps) {
     ["APIFY_DEFAULT_POLL_AFTER_MS", "5000"],
     ["APIFY_DATASET_ITEM_LIMIT", "100"],
     ["APIFY_SERVICE_PORT", "4040"],
-    ["MARKETPLACE_VERIFICATION_TOKEN", entry.verificationToken],
+    ["FAST_MARKETPLACE_VERIFICATION_TOKEN", entry.verificationToken],
   ]);
 
   startApp(appUuid);
