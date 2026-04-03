@@ -336,7 +336,7 @@ for (const entry of apps) {
     ["APIFY_DEFAULT_POLL_AFTER_MS", "5000"],
     ["APIFY_DATASET_ITEM_LIMIT", "100"],
     ["APIFY_SERVICE_PORT", "4040"],
-    ["FAST_VERIFY_TOKEN", entry.verificationToken],
+    ["APIFY_SITE_PROOF", entry.verificationToken],
   ]);
 
   startApp(appUuid);
