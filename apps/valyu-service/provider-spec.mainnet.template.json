@@ -171,11 +171,11 @@
       "description": "List available Valyu datasets, categories, schemas, and example queries.",
       "billingType": "fixed_x402",
       "price": "$0.0001",
-      "method": "GET",
+      "method": "POST",
       "mode": "sync",
       "requestSchemaJson": {
         "type": "object",
-        "additionalProperties": false
+        "additionalProperties": true
       },
       "responseSchemaJson": {
         "type": "object",

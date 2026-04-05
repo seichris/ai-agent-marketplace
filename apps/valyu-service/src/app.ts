@@ -57,9 +57,9 @@ function registerProxyRoute(
         method: route.method,
         headers: {
           "X-API-Key": valyuApiKey,
-          ...(route.method === "POST" ? { "content-type": "application/json" } : {})
+          "content-type": "application/json"
         },
-        ...(route.method === "POST" ? { body: JSON.stringify(req.body ?? {}) } : {})
+        body: JSON.stringify(req.body ?? {})
       });
     } catch (error) {
       return res.status(502).json({
@@ -71,12 +71,6 @@ function registerProxyRoute(
     const contentType = response.headers.get("content-type") ?? "application/json";
     return res.status(response.status).type(contentType).send(body);
   };
-
-  if (route.method === "GET") {
-    app.get(route.path, handler);
-    return;
-  }
-
   app.post(route.path, handler);
 }
 

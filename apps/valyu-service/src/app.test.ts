@@ -31,10 +31,10 @@ describe("valyu service", () => {
       responseBody: { success: true, answer: "Fast shipped an update." }
     },
     {
-      method: "get" as const,
+      method: "post" as const,
       path: "/datasources",
       upstreamUrl: "https://api.valyu.ai/v1/datasources",
-      requestBody: undefined,
+      requestBody: {},
       responseBody: { success: true, datasources: [] }
     }
   ])("forwards $path requests to Valyu with the configured API key", async ({
@@ -57,7 +57,7 @@ describe("valyu service", () => {
     });
 
     const response = request(app)[method](path);
-    const finalResponse = requestBody === undefined ? await response : await response.send(requestBody);
+    const finalResponse = await response.send(requestBody);
 
     expect(finalResponse.status).toBe(200);
     expect(finalResponse.body).toEqual(responseBody);
@@ -69,7 +69,7 @@ describe("valyu service", () => {
           "X-API-Key": "valyu-test-key",
           ...(method === "post" ? { "content-type": "application/json" } : {})
         }),
-        ...(requestBody === undefined ? {} : { body: JSON.stringify(requestBody) })
+        body: JSON.stringify(requestBody)
       })
     );
   });
@@ -151,7 +151,7 @@ describe("valyu service", () => {
     expect(response.body.paths["/search"].post.operationId).toBe("search");
     expect(response.body.paths["/contents"].post.operationId).toBe("contents");
     expect(response.body.paths["/answer"].post.operationId).toBe("answer");
-    expect(response.body.paths["/datasources"].get.operationId).toBe("datasources");
+    expect(response.body.paths["/datasources"].post.operationId).toBe("datasources");
     expect(response.body.paths["/health"]).toBeUndefined();
     expect(response.body.paths["/.well-known/fast-marketplace-verification.txt"]).toBeUndefined();
   });

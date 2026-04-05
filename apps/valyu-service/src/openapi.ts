@@ -1,7 +1,7 @@
 export interface ValyuProxyRouteDefinition {
   path: `/${string}`;
   upstreamPath: `/${string}`;
-  method: "GET" | "POST";
+  method: "POST";
   operationId: string;
   summary: string;
   description: string;
@@ -77,10 +77,11 @@ export const VALYU_PROXY_ROUTES: ValyuProxyRouteDefinition[] = [
   {
     path: "/datasources",
     upstreamPath: "/v1/datasources",
-    method: "GET",
+    method: "POST",
     operationId: "datasources",
     summary: "List available datasets",
     description: "List Valyu datasets, categories, schemas, and example queries.",
+    requestExample: {},
     responseExample: {
       success: true,
       total_count: 36,
