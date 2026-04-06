@@ -1,0 +1,84 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-influencer",
+    "name": "StableEnrich Influencer API",
+    "tagline": "Influencer and social profile enrichment APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich influencer endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Influencer",
+      "Enrichment"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich influencer endpoints for social-profile enrichment workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich social media profile with contact info",
+      "description": "Enrich social media profile with contact info",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/influencer/enrich-by-social",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "platform": "instagram",
+        "username": "string"
+      },
+      "responseExample": {
+        "status": "string",
+        "profile": {
+          "id": "string",
+          "email": "string",
+          "phone": "string",
+          "platform": "string",
+          "username": "string",
+          "followers": 0,
+          "following": 0,
+          "posts_count": 0
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find social profiles by email",
+      "description": "Find social profiles by email",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/influencer/enrich-by-email",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "email": "builder@example.com"
+      },
+      "responseExample": {
+        "status": "string",
+        "profiles": [
+          {
+            "id": "string",
+            "bio": "string",
+            "email": "string",
+            "platform": "string",
+            "username": "string",
+            "followers": 0,
+            "following": 0,
+            "engagement_rate": 0
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

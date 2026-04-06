@@ -1,0 +1,72 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-firecrawl",
+    "name": "StableEnrich Firecrawl API",
+    "tagline": "Web scraping and web search APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Firecrawl endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Scraping",
+      "Search"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Firecrawl endpoints for scraping and search workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Scrape a URL with full JavaScript rendering",
+      "description": "Scrape a URL with full JavaScript rendering",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/firecrawl/scrape",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "url": "https://example.com"
+      },
+      "responseExample": {
+        "url": "string",
+        "title": "string",
+        "content": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search the web and get scraped results",
+      "description": "Search the web and get scraped results",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/firecrawl/search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "query": "string",
+        "results": [
+          {
+            "url": "string",
+            "title": "string",
+            "snippet": "string",
+            "description": "string"
+          }
+        ],
+        "resultCount": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

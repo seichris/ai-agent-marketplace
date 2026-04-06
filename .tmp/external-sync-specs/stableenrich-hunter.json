@@ -1,0 +1,52 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-hunter",
+    "name": "StableEnrich Hunter API",
+    "tagline": "Email verification APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Hunter endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Email",
+      "Verification"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Hunter endpoints for email verification workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Verify email deliverability",
+      "description": "Verify email deliverability",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/hunter/email-verifier",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "email": "builder@example.com"
+      },
+      "responseExample": {
+        "email": "string",
+        "score": 0,
+        "regexp": true,
+        "status": "valid",
+        "webmail": true,
+        "gibberish": true,
+        "disposable": true,
+        "mx_records": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

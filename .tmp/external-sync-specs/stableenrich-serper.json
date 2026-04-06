@@ -1,0 +1,92 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-serper",
+    "name": "StableEnrich Serper API",
+    "tagline": "Google News and Shopping search APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Serper endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Search",
+      "News"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Serper endpoints for Google News and Shopping workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Google News search",
+      "description": "Google News search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/serper/news",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q": "string"
+      },
+      "responseExample": {
+        "news": [
+          {
+            "date": "string",
+            "link": "string",
+            "title": "string",
+            "source": "string",
+            "snippet": "string",
+            "imageUrl": "string",
+            "position": -9007199254740991
+          }
+        ],
+        "searchParameters": {
+          "q": "string",
+          "gl": "string",
+          "hl": "string",
+          "num": 0,
+          "type": "string"
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Google Shopping search",
+      "description": "Google Shopping search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/serper/shopping",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q": "string"
+      },
+      "responseExample": {
+        "shopping": [
+          {
+            "link": "string",
+            "title": "string",
+            "snippet": "string",
+            "position": -9007199254740991
+          }
+        ],
+        "searchParameters": {
+          "q": "string",
+          "gl": "string",
+          "hl": "string",
+          "num": 0,
+          "type": "string"
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

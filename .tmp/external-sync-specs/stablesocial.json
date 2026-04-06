@@ -1,0 +1,628 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stablesocial.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stablesocial",
+    "name": "StableSocial",
+    "tagline": "Pay-per-request social media data for agents.",
+    "about": "Discovery-only listing for StableSocial APIs covering social media retrieval and analysis workflows. Fast lists the provider metadata only; calls go directly to StableSocial.",
+    "categories": [
+      "Social",
+      "Data"
+    ],
+    "promptIntro": "Use this listing to discover StableSocial docs and social-data workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableSocial as required by the provider."
+    ],
+    "websiteUrl": "https://stablesocial.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook comment replies",
+      "description": "Get Facebook comment replies",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/comment-replies",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string",
+        "comment_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook followers",
+      "description": "Get Facebook followers",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/followers",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook following",
+      "description": "Get Facebook following",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/following",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook page/user posts",
+      "description": "Get Facebook page/user posts",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/posts",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook page/user profile",
+      "description": "Get Facebook page/user profile",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/profile",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Facebook post comments",
+      "description": "Get Facebook post comments",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/post-comments",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram comment replies",
+      "description": "Get Instagram comment replies",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/comment-replies",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string",
+        "comment_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram followers",
+      "description": "Get Instagram followers",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/followers",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram following",
+      "description": "Get Instagram following",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/following",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram post comments",
+      "description": "Get Instagram post comments",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/post-comments",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram user highlights",
+      "description": "Get Instagram user highlights",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/highlights",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram user posts",
+      "description": "Get Instagram user posts",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/posts",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram user profile",
+      "description": "Get Instagram user profile",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/profile",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Instagram user stories",
+      "description": "Get Instagram user stories",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/stories",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit comment details",
+      "description": "Get Reddit comment details",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/comment",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "comment_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit post comments",
+      "description": "Get Reddit post comments",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/post-comments",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit post details",
+      "description": "Get Reddit post details",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/post",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok comment replies",
+      "description": "Get TikTok comment replies",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/comment-replies",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string",
+        "comment_id": "string",
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok followers",
+      "description": "Get TikTok followers",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/followers",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok following",
+      "description": "Get TikTok following",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/following",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok user posts",
+      "description": "Get TikTok user posts",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/posts",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok user profile",
+      "description": "Get TikTok user profile",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/profile",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "handle": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get TikTok video comments",
+      "description": "Get TikTok video comments",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/post-comments",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string",
+        "profile_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get subreddit posts",
+      "description": "Get subreddit posts",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/subreddit",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "name": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Poll job status and retrieve results",
+      "description": "Poll job status and retrieve results",
+      "method": "GET",
+      "publicUrl": "https://stablesocial.dev/api/jobs",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "token": "..."
+      },
+      "responseExample": {
+        "status": "pending",
+        "message": "Poll again in a few seconds."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Facebook group profiles",
+      "description": "Search Facebook group profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/search-groups",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Facebook page profiles",
+      "description": "Search Facebook page profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/search-pages",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Facebook people profiles",
+      "description": "Search Facebook people profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/search-people",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Facebook posts by keyword",
+      "description": "Search Facebook posts by keyword",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/facebook/search",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Instagram by tag",
+      "description": "Search Instagram by tag",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/search-tags",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "tag": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Instagram posts by keyword",
+      "description": "Search Instagram posts by keyword",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/instagram/search",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Reddit posts by keyword",
+      "description": "Search Reddit posts by keyword",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/search",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Reddit user profiles",
+      "description": "Search Reddit user profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/search-profiles",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search TikTok by hashtag",
+      "description": "Search TikTok by hashtag",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/search-hashtag",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "hashtag": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search TikTok posts by keyword",
+      "description": "Search TikTok posts by keyword",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/search",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search TikTok posts by sound",
+      "description": "Search TikTok posts by sound",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/search-music",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "music_id": "string",
+        "music_title": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search TikTok user profiles",
+      "description": "Search TikTok user profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/tiktok/search-profiles",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

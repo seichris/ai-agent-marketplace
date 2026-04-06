@@ -1,0 +1,200 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-apollo",
+    "name": "StableEnrich Apollo API",
+    "tagline": "Apollo prospect and company search APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Apollo endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Data",
+      "Sales Intelligence"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Apollo endpoints for people and company search and enrichment workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich single company by domain",
+      "description": "Enrich single company by domain",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/org-enrich",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "domain": "string"
+      },
+      "responseExample": {
+        "status": "string",
+        "organization": {
+          "id": "string",
+          "name": "string",
+          "domain": "string",
+          "twitter_url": "string",
+          "website_url": "string",
+          "facebook_url": "string",
+          "linkedin_url": "string",
+          "primary_phone": {
+            "number": {},
+            "sanitized_number": {}
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich single person by email/name/domain",
+      "description": "Enrich single person by email/name/domain",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/people-enrich",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "id": "string",
+        "name": "string",
+        "email": "string",
+        "domain": "string",
+        "last_name": "string",
+        "first_name": "string",
+        "linkedin_url": "string",
+        "organization_name": "string"
+      },
+      "responseExample": {
+        "person": {
+          "id": "string",
+          "name": "string",
+          "email": "string",
+          "title": "string",
+          "last_name": "string",
+          "first_name": "string",
+          "email_status": "string",
+          "linkedin_url": "string"
+        },
+        "status": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find companies by filters",
+      "description": "Find companies by filters",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/org-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "page": 1,
+        "q_keywords": "string",
+        "excludeFields": [
+          "string"
+        ],
+        "organization_ids": [
+          "string"
+        ],
+        "organization_locations": [
+          "string"
+        ],
+        "q_organization_domains": [
+          "string"
+        ],
+        "organization_industry_tag_ids": [
+          "string"
+        ],
+        "organization_num_employees_ranges": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "pagination": {
+          "page": 0,
+          "per_page": 0,
+          "total_pages": 0,
+          "total_entries": 0
+        },
+        "organizations": [
+          {
+            "id": "string",
+            "name": "string",
+            "domain": "string",
+            "twitter_url": "string",
+            "website_url": "string",
+            "facebook_url": "string",
+            "linkedin_url": "string",
+            "primary_phone": {
+              "number": {},
+              "sanitized_number": {}
+            }
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find prospects by filters",
+      "description": "Find prospects by filters",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/people-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q_keywords": "string",
+        "person_titles": [
+          "string"
+        ],
+        "organization_ids": [
+          "string"
+        ],
+        "person_locations": [
+          "string"
+        ],
+        "person_not_titles": [
+          "string"
+        ],
+        "person_seniorities": [
+          "owner"
+        ],
+        "organization_locations": [
+          "string"
+        ],
+        "q_organization_domains": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "people": [
+          {
+            "id": "string",
+            "name": "string",
+            "email": "string",
+            "title": "string",
+            "last_name": "string",
+            "first_name": "string",
+            "email_status": "string",
+            "linkedin_url": "string"
+          }
+        ],
+        "pagination": {
+          "page": 0,
+          "per_page": 0,
+          "total_pages": 0,
+          "total_entries": 0
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

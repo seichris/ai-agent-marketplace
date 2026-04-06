@@ -1,0 +1,134 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-whitepages",
+    "name": "StableEnrich Whitepages API",
+    "tagline": "People and property lookup APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Whitepages endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Enrichment",
+      "People Data"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Whitepages endpoints for people and property search workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Property ownership and resident details by address",
+      "description": "Property ownership and resident details by address",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/whitepages/property-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "street": "string"
+      },
+      "responseExample": {
+        "result": {
+          "apn": "string",
+          "residents": [
+            {}
+          ],
+          "geolocation": {
+            "lat": {},
+            "lng": {}
+          },
+          "property_id": "string",
+          "ownership_info": {
+            "owner_type": {},
+            "person_owners": {},
+            "business_owners": {}
+          },
+          "mailing_address": {
+            "id": {},
+            "zip": {},
+            "city": {},
+            "line1": {},
+            "line2": {},
+            "state": {},
+            "address": {},
+            "full_address": {}
+          },
+          "property_address": {
+            "id": {},
+            "zip": {},
+            "city": {},
+            "line1": {},
+            "line2": {},
+            "state": {},
+            "address": {},
+            "full_address": {}
+          },
+          "property_details": {
+            "rooms": {},
+            "bedrooms": {},
+            "lot_size": {},
+            "bathrooms": {},
+            "year_built": {},
+            "property_use": {},
+            "building_area": {},
+            "building_type": {}
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search for people by name, phone, or address",
+      "description": "Search for people by name, phone, or address",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/whitepages/person-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "city": "string",
+        "name": "string",
+        "phone": "string",
+        "street": "string",
+        "zipcode": "string",
+        "last_name": "string",
+        "first_name": "string",
+        "state_code": "string"
+      },
+      "responseExample": {
+        "persons": [
+          {
+            "id": "string",
+            "name": "string",
+            "phones": [
+              {}
+            ],
+            "aliases": [
+              {}
+            ],
+            "is_dead": true,
+            "owned_properties": [
+              {}
+            ],
+            "current_addresses": [
+              {}
+            ],
+            "historic_addresses": [
+              {}
+            ]
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

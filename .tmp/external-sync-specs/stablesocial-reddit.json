@@ -1,0 +1,125 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stablesocial.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stablesocial-reddit",
+    "name": "StableSocial Reddit API",
+    "tagline": "Reddit post, comment, subreddit, and search APIs for agents.",
+    "about": "Discovery-only listing for StableSocial Reddit endpoints. Fast lists the provider metadata only; calls go directly to StableSocial.",
+    "categories": [
+      "Social",
+      "Reddit"
+    ],
+    "promptIntro": "Use this listing to discover StableSocial Reddit endpoints for posts, comments, subreddits, and search workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableSocial as required by the provider."
+    ],
+    "websiteUrl": "https://stablesocial.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit comment details",
+      "description": "Get Reddit comment details",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/comment",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "comment_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit post comments",
+      "description": "Get Reddit post comments",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/post-comments",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get Reddit post details",
+      "description": "Get Reddit post details",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/post",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "post_id": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get subreddit posts",
+      "description": "Get subreddit posts",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/subreddit",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "name": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Reddit posts by keyword",
+      "description": "Search Reddit posts by keyword",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/search",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Reddit user profiles",
+      "description": "Search Reddit user profiles",
+      "method": "POST",
+      "publicUrl": "https://stablesocial.dev/api/reddit/search-profiles",
+      "docsUrl": "https://stablesocial.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "keywords": "string"
+      },
+      "responseExample": {
+        "token": "eyJ..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

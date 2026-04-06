@@ -1,0 +1,557 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableemail.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableemail",
+    "name": "StableEmail",
+    "tagline": "Pay-per-send email delivery, inboxes, and custom email subdomains.",
+    "about": "Discovery-only listing for StableEmail email delivery, inbox, forwarding, and custom subdomain workflows. Fast lists the provider metadata only; calls go directly to StableEmail.",
+    "categories": [
+      "Email",
+      "Communication"
+    ],
+    "promptIntro": "Use this listing to discover StableEmail docs and pay-per-use email workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEmail as required by the provider."
+    ],
+    "websiteUrl": "https://stableemail.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Add or remove authorized wallet signers",
+      "description": "Add or remove authorized wallet signers",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/signers",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "action": "add",
+        "subdomain": {},
+        "walletAddress": "string"
+      },
+      "responseExample": {
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Buy a forwarding inbox (30 days)",
+      "description": "Buy a forwarding inbox (30 days)",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/buy",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice@stableemail.dev",
+        "success": true,
+        "expiresAt": "ISO date",
+        "daysRemaining": 30,
+        "retainMessages": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Cancel inbox and get pro-rata refund",
+      "description": "Cancel inbox and get pro-rata refund",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/cancel",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice@stableemail.dev",
+        "refund": {
+          "to": "0x...",
+          "amount": "0.50",
+          "status": "completed",
+          "network": "eip155:8453",
+          "currency": "USDC",
+          "transactionHash": "0x..."
+        },
+        "success": true,
+        "cancelled": true,
+        "daysRemaining": 15
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Check DNS/SES verification status",
+      "description": "Check DNS/SES verification status",
+      "method": "GET",
+      "publicUrl": "https://stableemail.dev/api/subdomain/status",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "subdomain": "string"
+      },
+      "responseExample": {
+        "signers": [
+          "0x..."
+        ],
+        "subdomain": "string",
+        "dnsVerified": true,
+        "ownerWallet": "string",
+        "sesVerified": true,
+        "signerCount": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Check inbox status and expiry",
+      "description": "Check inbox status and expiry",
+      "method": "GET",
+      "publicUrl": "https://stableemail.dev/api/inbox/status",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": "string"
+      },
+      "responseExample": {
+        "inbox": "alice@stableemail.dev",
+        "active": true,
+        "pricing": {},
+        "daysOwned": 0,
+        "expiresAt": "ISO date",
+        "forwardTo": "email",
+        "ownerWallet": "0x...",
+        "daysRemaining": 0,
+        "retainMessages": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Create inbox on subdomain",
+      "description": "Create inbox on subdomain",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/create",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "localPart": "string",
+        "subdomain": {}
+      },
+      "responseExample": {
+        "inbox": "biden@craig.stableemail.dev",
+        "success": true,
+        "messageLimit": 500,
+        "retainMessages": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Delete a subdomain inbox message",
+      "description": "Delete a subdomain inbox message",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/messages/delete",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "messageId": "string"
+      },
+      "responseExample": {
+        "deleted": "string",
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Delete an inbox message",
+      "description": "Delete an inbox message",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/messages/delete",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "messageId": "string"
+      },
+      "responseExample": {
+        "deleted": "string",
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Delete inbox from subdomain",
+      "description": "Delete inbox from subdomain",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/delete",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "localPart": "string",
+        "subdomain": {}
+      },
+      "responseExample": {
+        "deleted": "biden@craig.stableemail.dev",
+        "success": true,
+        "messagesDeleted": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extend inbox 30 days",
+      "description": "Extend inbox 30 days",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/topup",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice",
+        "success": true,
+        "daysAdded": 30,
+        "expiresAt": "ISO date",
+        "daysRemaining": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extend inbox 365 days (save 34%)",
+      "description": "Extend inbox 365 days (save 34%)",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/topup/year",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice",
+        "success": true,
+        "daysAdded": 365,
+        "expiresAt": "ISO date",
+        "daysRemaining": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extend inbox 90 days (save 17%)",
+      "description": "Extend inbox 90 days (save 17%)",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/topup/quarter",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice",
+        "success": true,
+        "daysAdded": 90,
+        "expiresAt": "ISO date",
+        "daysRemaining": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "List messages in inbox",
+      "description": "List messages in inbox",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/messages",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "success": true,
+        "messages": [
+          {
+            "id": "string",
+            "read": true,
+            "subject": "string",
+            "fromEmail": "string",
+            "receivedAt": "ISO date"
+          }
+        ],
+        "nextCursor": "message id (optional)"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "List subdomain inbox messages",
+      "description": "List subdomain inbox messages",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/messages",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "localPart": "string",
+        "subdomain": {}
+      },
+      "responseExample": {
+        "success": true,
+        "warning": "string?",
+        "messages": [],
+        "nextCursor": "string?",
+        "messageCount": 0,
+        "messageLimit": 500
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "List subdomain inboxes",
+      "description": "List subdomain inboxes",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/list",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "subdomain": {}
+      },
+      "responseExample": {
+        "inboxes": [
+          {
+            "active": true,
+            "address": "string",
+            "forwardTo": "string?",
+            "localPart": "string",
+            "unreadCount": 0,
+            "messageCount": 0,
+            "retainMessages": true
+          }
+        ],
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Purchase a custom email subdomain",
+      "description": "Purchase a custom email subdomain",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/buy",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "subdomain": {}
+      },
+      "responseExample": {
+        "success": true,
+        "dnsStatus": "pending",
+        "subdomain": "yourname.stableemail.dev"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Read a single inbox message",
+      "description": "Read a single inbox message",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/messages/read",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "messageId": "string"
+      },
+      "responseExample": {
+        "message": {
+          "id": "string",
+          "to": [
+            "string"
+          ],
+          "date": "ISO date",
+          "from": "string",
+          "html": "string",
+          "text": "string",
+          "subject": "string",
+          "receivedAt": "ISO date",
+          "attachments": [
+            {
+              "size": 0,
+              "filename": "string",
+              "contentType": "string"
+            }
+          ]
+        },
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Read a subdomain inbox message",
+      "description": "Read a subdomain inbox message",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/messages/read",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "messageId": "string"
+      },
+      "responseExample": {
+        "message": {
+          "id": "string",
+          "to": [
+            "string"
+          ],
+          "date": "ISO date",
+          "from": "string",
+          "html": "string",
+          "text": "string",
+          "subject": "string",
+          "receivedAt": "ISO date",
+          "attachments": [
+            {
+              "size": 0,
+              "filename": "string",
+              "contentType": "string"
+            }
+          ]
+        },
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Send email from custom subdomain",
+      "description": "Send email from custom subdomain",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/send",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "to": [
+          "builder@example.com"
+        ],
+        "from": "builder@example.com",
+        "subject": "string"
+      },
+      "responseExample": {
+        "from": "string",
+        "success": true,
+        "messageId": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Send email from inbox address",
+      "description": "Send email from inbox address",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/send",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "to": [
+          "builder@example.com"
+        ],
+        "subject": "string",
+        "username": {}
+      },
+      "responseExample": {
+        "from": "alice@stableemail.dev",
+        "success": true,
+        "messageId": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Send email from relay address",
+      "description": "Send email from relay address",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/send",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "to": [
+          "builder@example.com"
+        ],
+        "subject": "string"
+      },
+      "responseExample": {
+        "from": "string",
+        "success": true,
+        "messageId": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Update inbox settings",
+      "description": "Update inbox settings",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/inbox/update",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "username": {}
+      },
+      "responseExample": {
+        "inbox": "alice@stableemail.dev",
+        "success": true,
+        "forwardTo": "newemail@example.com",
+        "retainMessages": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Update subdomain inbox settings",
+      "description": "Update subdomain inbox settings",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/inbox/update",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "localPart": "string",
+        "subdomain": {}
+      },
+      "responseExample": {
+        "inbox": "biden@craig.stableemail.dev",
+        "success": true,
+        "forwardTo": "string?",
+        "retainMessages": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Update subdomain settings (catch-all forwarding)",
+      "description": "Update subdomain settings (catch-all forwarding)",
+      "method": "POST",
+      "publicUrl": "https://stableemail.dev/api/subdomain/update",
+      "docsUrl": "https://stableemail.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "subdomain": {}
+      },
+      "responseExample": {
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

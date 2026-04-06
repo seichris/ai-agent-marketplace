@@ -1,0 +1,222 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://build.zapper.xyz",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "zapper-x402",
+    "name": "Zapper x402 API",
+    "tagline": "Pay-per-query blockchain data and market intelligence for agents.",
+    "about": "Discovery-only listing for Zapper x402 endpoints covering token rankings, token prices, swap flow, and token activity. Fast lists the provider metadata only; calls go directly to Zapper.",
+    "categories": [
+      "Blockchain Data",
+      "Analytics"
+    ],
+    "promptIntro": "Use this listing to discover Zapper x402 endpoints and blockchain data workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with Zapper as required by the provider."
+    ],
+    "websiteUrl": "https://build.zapper.xyz",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Get general swap feed",
+      "description": "Inspect recent swap flow through the Zapper x402 general swap feed endpoint.",
+      "method": "POST",
+      "publicUrl": "https://build.zapper.xyz/x402/general-swap-feed",
+      "docsUrl": "https://build.zapper.xyz/x402",
+      "authNotes": "See the Zapper x402 docs for payment and request requirements.",
+      "requestExample": {
+        "body": {}
+      },
+      "responseExample": {
+        "data": {
+          "generalSwapFeed": {
+            "edges": [
+              {
+                "node": {
+                  "id": "swap-feed-1",
+                  "swap": {
+                    "id": "swap-1",
+                    "fid": 1234,
+                    "isBuy": true,
+                    "token": {
+                      "symbol": "USDC",
+                      "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+                    },
+                    "amount": 1250.5,
+                    "chainId": 8453,
+                    "network": {
+                      "chainId": 8453
+                    },
+                    "profile": {
+                      "fid": 1234
+                    },
+                    "parentUrl": "https://warpcast.com/example/0x123",
+                    "timestamp": "2026-03-30T00:00:00Z",
+                    "volumeUsd": 1250.5,
+                    "transactionHash": "0xabc123",
+                    "farcasterContext": {
+                      "likeCount": 42
+                    }
+                  },
+                  "type": "ChannelFeedSwap"
+                },
+                "cursor": "cursor_1"
+              }
+            ],
+            "pageInfo": {
+              "endCursor": "cursor_end",
+              "hasNextPage": true,
+              "startCursor": "cursor_start",
+              "hasPreviousPage": false
+            }
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get token activity feed",
+      "description": "Inspect token activity and discussion signals through the Zapper x402 activity feed endpoint.",
+      "method": "POST",
+      "publicUrl": "https://build.zapper.xyz/x402/token-activity-feed",
+      "docsUrl": "https://build.zapper.xyz/x402",
+      "authNotes": "See the Zapper x402 docs for payment and request requirements.",
+      "requestExample": {
+        "type": "DEFAULT",
+        "chainId": 8453,
+        "filters": {
+          "minimumUsdVolume": 1000
+        },
+        "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913"
+      },
+      "responseExample": {
+        "data": {
+          "tokenActivityFeed": {
+            "edges": [
+              {
+                "node": {
+                  "id": "activity-1",
+                  "fid": 1234,
+                  "hash": "0xcasthash",
+                  "text": "USDC activity spiking on Base.",
+                  "isBuy": true,
+                  "amount": 4200.75,
+                  "chainId": 8453,
+                  "authorFid": 1234,
+                  "timestamp": "2026-03-30T00:00:00Z",
+                  "volumeUsd": 4200.75,
+                  "transactionHash": "0xabc123"
+                },
+                "cursor": "cursor_1"
+              }
+            ],
+            "pageInfo": {
+              "endCursor": "cursor_end",
+              "hasNextPage": true,
+              "startCursor": "cursor_start",
+              "hasPreviousPage": false
+            }
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get token price data",
+      "description": "Retrieve token price and price-change data through the Zapper x402 token price endpoint.",
+      "method": "POST",
+      "publicUrl": "https://build.zapper.xyz/x402/token-price",
+      "docsUrl": "https://build.zapper.xyz/x402",
+      "authNotes": "See the Zapper x402 docs for payment and request requirements.",
+      "requestExample": {
+        "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+        "chainId": 8453,
+        "currency": "USD"
+      },
+      "responseExample": {
+        "data": {
+          "fungibleTokenV2": {
+            "name": "USD Coin",
+            "symbol": "USDC",
+            "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+            "decimals": 6,
+            "priceData": {
+              "price": 1,
+              "marketCap": 1000000000,
+              "volume24h": 250000000,
+              "priceChange1h": 0,
+              "priceChange5m": 0,
+              "priceChange24h": 0,
+              "totalLiquidity": 500000000,
+              "totalGasTokenLiquidity": 10000000
+            },
+            "imageUrlV2": "https://example.com/usdc.png"
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get trending token rankings",
+      "description": "Get trending tokens through Zapper's x402 token ranking endpoint.",
+      "method": "POST",
+      "publicUrl": "https://build.zapper.xyz/x402/token-ranking",
+      "docsUrl": "https://build.zapper.xyz/x402",
+      "authNotes": "See the Zapper x402 docs for payment and request requirements.",
+      "requestExample": {
+        "first": 10
+      },
+      "responseExample": {
+        "data": {
+          "tokenRanking": {
+            "edges": [
+              {
+                "node": {
+                  "id": "ranking-1",
+                  "token": {
+                    "name": "USD Coin",
+                    "symbol": "USDC",
+                    "address": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                    "priceData": {
+                      "price": 1,
+                      "marketCap": 1000000000,
+                      "volume24h": 250000000,
+                      "priceChange1h": 0,
+                      "priceChange5m": 0,
+                      "priceChange24h": 0,
+                      "totalLiquidity": 500000000
+                    },
+                    "imageUrlV2": "https://example.com/usdc.png"
+                  },
+                  "chainId": 8453,
+                  "buyCount": 128,
+                  "buyerCount": 74,
+                  "tokenAddress": "0x833589fCD6eDb6E08f4c7C32D4f71b54bdA02913",
+                  "buyerCount24h": 21
+                },
+                "cursor": "cursor_1"
+              }
+            ],
+            "pageInfo": {
+              "endCursor": "cursor_10",
+              "hasNextPage": true
+            }
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

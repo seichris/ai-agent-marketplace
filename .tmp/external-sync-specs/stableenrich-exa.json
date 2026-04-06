@@ -1,0 +1,128 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich-exa",
+    "name": "StableEnrich Exa API",
+    "tagline": "Neural search, similarity, content, and answer APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich Exa endpoints. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Search",
+      "Research"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich Exa endpoints for neural search and content extraction workflows.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "AI-generated answers with citations",
+      "description": "AI-generated answers with citations",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/answer",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "answer": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extract content from URLs",
+      "description": "Extract content from URLs",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/contents",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "urls": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find pages similar to a URL",
+      "description": "Find pages similar to a URL",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/find-similar",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "url": "https://example.com"
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Neural web search",
+      "description": "Neural web search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

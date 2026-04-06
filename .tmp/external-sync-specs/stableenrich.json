@@ -1,0 +1,851 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableenrich.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableenrich",
+    "name": "StableEnrich",
+    "tagline": "Research, search, scraping, and enrichment APIs for agents.",
+    "about": "Discovery-only listing for StableEnrich APIs spanning people, company, search, scraping, maps, and enrichment workflows. Fast lists the provider metadata only; calls go directly to StableEnrich.",
+    "categories": [
+      "Data",
+      "Search"
+    ],
+    "promptIntro": "Use this listing to discover StableEnrich docs and pay-per-request enrichment workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableEnrich as required by the provider."
+    ],
+    "websiteUrl": "https://stableenrich.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "AI-generated answers with citations",
+      "description": "AI-generated answers with citations",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/answer",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "answer": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich contact info from LinkedIn URL, email, or phone",
+      "description": "Enrich contact info from LinkedIn URL, email, or phone",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/clado/contacts-enrich",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "email": "string",
+        "phone": "string",
+        "linkedin_url": "string",
+        "email_enrichment": false,
+        "phone_enrichment": false
+      },
+      "responseExample": {
+        "data": [
+          {
+            "social": [
+              {
+                "link": {},
+                "type": {},
+                "rating": {}
+              }
+            ],
+            "contacts": [
+              {
+                "type": {},
+                "value": {},
+                "rating": {}
+              }
+            ]
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich single company by domain",
+      "description": "Enrich single company by domain",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/org-enrich",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "domain": "string"
+      },
+      "responseExample": {
+        "status": "string",
+        "organization": {
+          "id": "string",
+          "name": "string",
+          "domain": "string",
+          "twitter_url": "string",
+          "website_url": "string",
+          "facebook_url": "string",
+          "linkedin_url": "string",
+          "primary_phone": {
+            "number": {},
+            "sanitized_number": {}
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich single person by email/name/domain",
+      "description": "Enrich single person by email/name/domain",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/people-enrich",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "id": "string",
+        "name": "string",
+        "email": "string",
+        "domain": "string",
+        "last_name": "string",
+        "first_name": "string",
+        "linkedin_url": "string",
+        "organization_name": "string"
+      },
+      "responseExample": {
+        "person": {
+          "id": "string",
+          "name": "string",
+          "email": "string",
+          "title": "string",
+          "last_name": "string",
+          "first_name": "string",
+          "email_status": "string",
+          "linkedin_url": "string"
+        },
+        "status": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Enrich social media profile with contact info",
+      "description": "Enrich social media profile with contact info",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/influencer/enrich-by-social",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "platform": "instagram",
+        "username": "string"
+      },
+      "responseExample": {
+        "status": "string",
+        "profile": {
+          "id": "string",
+          "email": "string",
+          "phone": "string",
+          "platform": "string",
+          "username": "string",
+          "followers": 0,
+          "following": 0,
+          "posts_count": 0
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extract content from URLs",
+      "description": "Extract content from URLs",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/contents",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "urls": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find companies by filters",
+      "description": "Find companies by filters",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/org-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "page": 1,
+        "q_keywords": "string",
+        "excludeFields": [
+          "string"
+        ],
+        "organization_ids": [
+          "string"
+        ],
+        "organization_locations": [
+          "string"
+        ],
+        "q_organization_domains": [
+          "string"
+        ],
+        "organization_industry_tag_ids": [
+          "string"
+        ],
+        "organization_num_employees_ranges": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "pagination": {
+          "page": 0,
+          "per_page": 0,
+          "total_pages": 0,
+          "total_entries": 0
+        },
+        "organizations": [
+          {
+            "id": "string",
+            "name": "string",
+            "domain": "string",
+            "twitter_url": "string",
+            "website_url": "string",
+            "facebook_url": "string",
+            "linkedin_url": "string",
+            "primary_phone": {
+              "number": {},
+              "sanitized_number": {}
+            }
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find pages similar to a URL",
+      "description": "Find pages similar to a URL",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/find-similar",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "url": "https://example.com"
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find prospects by filters",
+      "description": "Find prospects by filters",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/apollo/people-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q_keywords": "string",
+        "person_titles": [
+          "string"
+        ],
+        "organization_ids": [
+          "string"
+        ],
+        "person_locations": [
+          "string"
+        ],
+        "person_not_titles": [
+          "string"
+        ],
+        "person_seniorities": [
+          "owner"
+        ],
+        "organization_locations": [
+          "string"
+        ],
+        "q_organization_domains": [
+          "string"
+        ]
+      },
+      "responseExample": {
+        "people": [
+          {
+            "id": "string",
+            "name": "string",
+            "email": "string",
+            "title": "string",
+            "last_name": "string",
+            "first_name": "string",
+            "email_status": "string",
+            "linkedin_url": "string"
+          }
+        ],
+        "pagination": {
+          "page": 0,
+          "per_page": 0,
+          "total_pages": 0,
+          "total_entries": 0
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Find social profiles by email",
+      "description": "Find social profiles by email",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/influencer/enrich-by-email",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "email": "builder@example.com"
+      },
+      "responseExample": {
+        "status": "string",
+        "profiles": [
+          {
+            "id": "string",
+            "bio": "string",
+            "email": "string",
+            "platform": "string",
+            "username": "string",
+            "followers": 0,
+            "following": 0,
+            "engagement_rate": 0
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Full place details by ID",
+      "description": "Full place details by ID",
+      "method": "GET",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/place-details/full",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "placeId": "string",
+        "excludeFields": [
+          "photos"
+        ]
+      },
+      "responseExample": {
+        "id": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get post details and comments",
+      "description": "Get post details and comments",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/reddit/post-comments",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "url": "https://example.com"
+      },
+      "responseExample": {
+        "post": {
+          "id": "string",
+          "score": 0,
+          "title": "string",
+          "author": "string",
+          "selftext": "string",
+          "createdAt": "string",
+          "subreddit": "string",
+          "numComments": 0
+        },
+        "cursor": "string",
+        "hasMore": true,
+        "comments": [
+          {
+            "id": "string",
+            "body": "string",
+            "score": 0,
+            "author": "string",
+            "createdAt": "string",
+            "bodyTruncated": true
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Google News search",
+      "description": "Google News search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/serper/news",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q": "string"
+      },
+      "responseExample": {
+        "news": [
+          {
+            "date": "string",
+            "link": "string",
+            "title": "string",
+            "source": "string",
+            "snippet": "string",
+            "imageUrl": "string",
+            "position": -9007199254740991
+          }
+        ],
+        "searchParameters": {
+          "q": "string",
+          "gl": "string",
+          "hl": "string",
+          "num": 0,
+          "type": "string"
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Google Shopping search",
+      "description": "Google Shopping search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/serper/shopping",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "q": "string"
+      },
+      "responseExample": {
+        "shopping": [
+          {
+            "link": "string",
+            "title": "string",
+            "snippet": "string",
+            "position": -9007199254740991
+          }
+        ],
+        "searchParameters": {
+          "q": "string",
+          "gl": "string",
+          "hl": "string",
+          "num": 0,
+          "type": "string"
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nearby search with basic details",
+      "description": "Nearby search with basic details",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/nearby-search/partial",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "locationRestriction": {
+          "circle": {
+            "center": {
+              "latitude": 0,
+              "longitude": 0
+            },
+            "radius": 0
+          }
+        }
+      },
+      "responseExample": {
+        "places": [
+          {
+            "id": "string"
+          }
+        ],
+        "nextPageToken": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nearby search with full details",
+      "description": "Nearby search with full details",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/nearby-search/full",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "locationRestriction": {
+          "circle": {
+            "center": {
+              "latitude": 0,
+              "longitude": 0
+            },
+            "radius": 0
+          }
+        }
+      },
+      "responseExample": {
+        "places": [
+          {
+            "id": "string"
+          }
+        ],
+        "nextPageToken": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Neural web search",
+      "description": "Neural web search",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/exa/search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "results": [
+          {
+            "id": "string",
+            "url": "string",
+            "image": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "favicon": "string",
+            "publishedDate": "string"
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Partial place details by ID",
+      "description": "Partial place details by ID",
+      "method": "GET",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/place-details/partial",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "placeId": "string",
+        "excludeFields": [
+          "photos"
+        ]
+      },
+      "responseExample": {
+        "id": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Property ownership and resident details by address",
+      "description": "Property ownership and resident details by address",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/whitepages/property-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "street": "string"
+      },
+      "responseExample": {
+        "result": {
+          "apn": "string",
+          "residents": [
+            {}
+          ],
+          "geolocation": {
+            "lat": {},
+            "lng": {}
+          },
+          "property_id": "string",
+          "ownership_info": {
+            "owner_type": {},
+            "person_owners": {},
+            "business_owners": {}
+          },
+          "mailing_address": {
+            "id": {},
+            "zip": {},
+            "city": {},
+            "line1": {},
+            "line2": {},
+            "state": {},
+            "address": {},
+            "full_address": {}
+          },
+          "property_address": {
+            "id": {},
+            "zip": {},
+            "city": {},
+            "line1": {},
+            "line2": {},
+            "state": {},
+            "address": {},
+            "full_address": {}
+          },
+          "property_details": {
+            "rooms": {},
+            "bedrooms": {},
+            "lot_size": {},
+            "bathrooms": {},
+            "year_built": {},
+            "property_use": {},
+            "building_area": {},
+            "building_type": {}
+          }
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Scrape a URL with full JavaScript rendering",
+      "description": "Scrape a URL with full JavaScript rendering",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/firecrawl/scrape",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "url": "https://example.com"
+      },
+      "responseExample": {
+        "url": "string",
+        "title": "string",
+        "content": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Scrape full LinkedIn profile data",
+      "description": "Scrape full LinkedIn profile data",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/clado/linkedin-scrape",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "linkedin_url": "https://www.linkedin.com/in/example"
+      },
+      "responseExample": {
+        "headline": "Product Manager at Example Co",
+        "location": "San Francisco, CA",
+        "full_name": "Jane Example",
+        "linkedin_url": "https://www.linkedin.com/in/example"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search Reddit posts",
+      "description": "Search Reddit posts",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/reddit/search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "after": "string",
+        "posts": [
+          {
+            "id": "string",
+            "score": 0,
+            "title": "string",
+            "author": "string",
+            "selftext": "string",
+            "createdAt": "string",
+            "subreddit": "string",
+            "numComments": 0
+          }
+        ],
+        "searchContext": {
+          "query": "string",
+          "resultCount": 0
+        }
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search for people by name, phone, or address",
+      "description": "Search for people by name, phone, or address",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/whitepages/person-search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "city": "string",
+        "name": "string",
+        "phone": "string",
+        "street": "string",
+        "zipcode": "string",
+        "last_name": "string",
+        "first_name": "string",
+        "state_code": "string"
+      },
+      "responseExample": {
+        "persons": [
+          {
+            "id": "string",
+            "name": "string",
+            "phones": [
+              {}
+            ],
+            "aliases": [
+              {}
+            ],
+            "is_dead": true,
+            "owned_properties": [
+              {}
+            ],
+            "current_addresses": [
+              {}
+            ],
+            "historic_addresses": [
+              {}
+            ]
+          }
+        ]
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Search the web and get scraped results",
+      "description": "Search the web and get scraped results",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/firecrawl/search",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "query": "string"
+      },
+      "responseExample": {
+        "query": "string",
+        "results": [
+          {
+            "url": "string",
+            "title": "string",
+            "snippet": "string",
+            "description": "string"
+          }
+        ],
+        "resultCount": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Text search with basic details",
+      "description": "Text search with basic details",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/text-search/partial",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "textQuery": "string"
+      },
+      "responseExample": {
+        "places": [
+          {
+            "id": "string"
+          }
+        ],
+        "nextPageToken": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Text search with full details",
+      "description": "Text search with full details",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/google-maps/text-search/full",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "textQuery": "string"
+      },
+      "responseExample": {
+        "places": [
+          {
+            "id": "string"
+          }
+        ],
+        "nextPageToken": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Verify email deliverability",
+      "description": "Verify email deliverability",
+      "method": "POST",
+      "publicUrl": "https://stableenrich.dev/api/hunter/email-verifier",
+      "docsUrl": "https://stableenrich.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "email": "builder@example.com"
+      },
+      "responseExample": {
+        "email": "string",
+        "score": 0,
+        "regexp": true,
+        "status": "valid",
+        "webmail": true,
+        "gibberish": true,
+        "disposable": true,
+        "mx_records": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

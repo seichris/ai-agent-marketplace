@@ -1,0 +1,174 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stableupload.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stableupload",
+    "name": "StableUpload",
+    "tagline": "Pay-per-upload file hosting and static site hosting for agents.",
+    "about": "Discovery-only listing for StableUpload file hosting, uploads, and static site workflows. Fast lists the provider metadata only; calls go directly to StableUpload.",
+    "categories": [
+      "Storage",
+      "Hosting"
+    ],
+    "promptIntro": "Use this listing to discover StableUpload docs and pay-per-upload hosting workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableUpload as required by the provider."
+    ],
+    "websiteUrl": "https://stableupload.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Buy a site upload slot for zip hosting",
+      "description": "Buy a site upload slot for zip hosting",
+      "method": "POST",
+      "publicUrl": "https://stableupload.dev/api/site",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "tier": "10mb",
+        "filename": "string"
+      },
+      "responseExample": {
+        "maxSize": 0,
+        "uploadId": "string",
+        "expiresAt": "string",
+        "uploadUrl": "string",
+        "curlExample": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Buy an upload slot (10MB $0.02, 100MB $0.20, 1GB $2.00)",
+      "description": "Buy an upload slot (10MB $0.02, 100MB $0.20, 1GB $2.00)",
+      "method": "POST",
+      "publicUrl": "https://stableupload.dev/api/upload",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "tier": "10mb",
+        "filename": "string",
+        "contentType": "string"
+      },
+      "responseExample": {
+        "maxSize": 0,
+        "siteUrl": "string",
+        "uploadId": "string",
+        "expiresAt": "string",
+        "publicUrl": "string",
+        "uploadUrl": "string",
+        "curlExample": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Check TLS provisioning status",
+      "description": "Check TLS provisioning status",
+      "method": "GET",
+      "publicUrl": "https://stableupload.dev/api/site/domain/status",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "uploadId": "k7gm3nqp2"
+      },
+      "responseExample": {
+        "ssl": "string",
+        "status": "string",
+        "hostname": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Connect a custom domain to a site",
+      "description": "Connect a custom domain to a site",
+      "method": "POST",
+      "publicUrl": "https://stableupload.dev/api/site/domain",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "hostname": "string",
+        "uploadId": "string"
+      },
+      "responseExample": {
+        "status": "string",
+        "hostname": "string",
+        "dnsRecords": [
+          {
+            "name": "string",
+            "type": "string",
+            "value": "string"
+          }
+        ],
+        "customHostnameId": "string"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Extract zip and make site live",
+      "description": "Extract zip and make site live",
+      "method": "POST",
+      "publicUrl": "https://stableupload.dev/api/site/activate",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "uploadId": "string"
+      },
+      "responseExample": {
+        "files": [
+          "string"
+        ],
+        "siteUrl": "string",
+        "fileCount": 0
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Get upload details by ID",
+      "description": "Get upload details by ID",
+      "method": "GET",
+      "publicUrl": "https://stableupload.dev/api/download/:uploadId",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "uploadId": "k7gm3nqp2"
+      },
+      "responseExample": {
+        "uploadId": "k7gm3nqp2",
+        "expiresAt": "2026-01-01T00:00:00Z",
+        "publicUrl": "https://stableupload.dev/u/k7gm3nqp2/file.png"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "List uploads for authenticated wallet",
+      "description": "List uploads for authenticated wallet",
+      "method": "GET",
+      "publicUrl": "https://stableupload.dev/api/uploads",
+      "docsUrl": "https://stableupload.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "limit": "50",
+        "cursor": "abc123"
+      },
+      "responseExample": {
+        "uploads": [],
+        "nextCursor": "abc123"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}

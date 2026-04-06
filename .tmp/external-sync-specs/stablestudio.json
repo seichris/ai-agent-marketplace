@@ -1,0 +1,520 @@
+{
+  "profile": {
+    "displayName": "Fast Marketplace Providers",
+    "bio": "Marketplace-operated provider account for curated external API listings.",
+    "websiteUrl": "https://stablestudio.dev",
+    "contactEmail": "marketplace@fast.xyz"
+  },
+  "service": {
+    "serviceType": "external_registry",
+    "slug": "stablestudio",
+    "name": "StableStudio",
+    "tagline": "Pay-per-generation image and video creation for agents.",
+    "about": "Discovery-only listing for StableStudio image and video generation workflows across multiple models. Fast lists the provider metadata only; calls go directly to StableStudio.",
+    "categories": [
+      "Media",
+      "AI"
+    ],
+    "promptIntro": "Use this listing to discover StableStudio docs and generative media workflows for agents.",
+    "setupInstructions": [
+      "Review the provider docs before calling any endpoint.",
+      "Authenticate directly with the provider as required by the provider.",
+      "Authenticate directly with StableStudio as required by the provider."
+    ],
+    "websiteUrl": "https://stablestudio.dev",
+    "payoutWallet": null
+  },
+  "endpoints": [
+    {
+      "endpointType": "external_registry",
+      "title": "Confirm uploaded file",
+      "description": "Confirm uploaded file",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/upload/confirm",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "blobUrl": "https://blob.vercel-storage.com/example.png",
+        "uploadId": "uuid"
+      },
+      "responseExample": {
+        "upload": {
+          "id": "uuid",
+          "blobUrl": "https://blob.vercel-storage.com/example.png"
+        },
+        "success": true
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Flux 2 Pro image editing",
+      "description": "Flux 2 Pro image editing",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/flux-2-pro/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Flux 2 Pro image generation",
+      "description": "Flux 2 Pro image generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/flux-2-pro/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "GPT Image 1 editing",
+      "description": "GPT Image 1 editing",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/gpt-image-1/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "GPT Image 1 generation",
+      "description": "GPT Image 1 generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/gpt-image-1/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "GPT Image 1.5 editing",
+      "description": "GPT Image 1.5 editing",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/gpt-image-1.5/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "GPT Image 1.5 generation",
+      "description": "GPT Image 1.5 generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/gpt-image-1.5/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Grok image editing",
+      "description": "Grok image editing",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/grok/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Grok image generation",
+      "description": "Grok image generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/grok/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Grok video generation",
+      "description": "Grok video generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/grok-video/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "List jobs",
+      "description": "GET /api/jobs endpoint",
+      "method": "GET",
+      "publicUrl": "https://stablestudio.dev/api/jobs",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "pathname": "uploads/uuid/image.png\""
+      },
+      "responseExample": {
+        "result": {
+          "imageUrl": "https://..."
+        },
+        "status": "complete"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nano Banana Pro image editing (up to 4K)",
+      "description": "Nano Banana Pro image editing (up to 4K)",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/nano-banana-pro/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nano Banana Pro image generation (up to 4K)",
+      "description": "Nano Banana Pro image generation (up to 4K)",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/nano-banana-pro/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nano Banana image editing",
+      "description": "Nano Banana image editing",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/nano-banana/edit",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "images": [
+          "https://example.com"
+        ],
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Nano Banana image generation",
+      "description": "Nano Banana image generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/nano-banana/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Poll job status and retrieve results",
+      "description": "Poll job status and retrieve results",
+      "method": "GET",
+      "publicUrl": "https://stablestudio.dev/api/jobs/:jobId",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "jobId": "job_123"
+      },
+      "responseExample": {
+        "result": {
+          "imageUrl": "https://..."
+        },
+        "status": "complete"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Seedance Fast image-to-video",
+      "description": "Seedance Fast image-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/seedance-fast/i2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "image": "https://example.com",
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Seedance Fast text-to-video",
+      "description": "Seedance Fast text-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/seedance-fast/t2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Seedance image-to-video",
+      "description": "Seedance image-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/seedance/i2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "image": "https://example.com",
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Seedance text-to-video",
+      "description": "Seedance text-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/seedance/t2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Sora 2 Pro video generation",
+      "description": "Sora 2 Pro video generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/sora-2-pro/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Sora 2 video generation",
+      "description": "Sora 2 video generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/sora-2/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Upload image for editing or image-to-video",
+      "description": "Upload image for editing or image-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/upload",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "filename": "string",
+        "contentType": "image/jpeg"
+      },
+      "responseExample": {
+        "pathname": "uploads/uuid/image.png",
+        "uploadId": "uuid",
+        "expiresAt": "2026-01-01T00:00:00Z",
+        "clientToken": "vercel_blob_..."
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Veo 3.1 Fast video generation",
+      "description": "Veo 3.1 Fast video generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/veo-3.1-fast/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Veo 3.1 video generation",
+      "description": "Veo 3.1 video generation",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/veo-3.1/generate",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Wan 2.6 image-to-video",
+      "description": "Wan 2.6 image-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/wan-2.6/i2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "image": "https://example.com",
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    },
+    {
+      "endpointType": "external_registry",
+      "title": "Wan 2.6 text-to-video",
+      "description": "Wan 2.6 text-to-video",
+      "method": "POST",
+      "publicUrl": "https://stablestudio.dev/api/generate/wan-2.6/t2v",
+      "docsUrl": "https://stablestudio.dev/llms.txt",
+      "authNotes": "See provider docs for wallet-bound access, pricing, and any provider-side auth requirements.",
+      "requestExample": {
+        "prompt": "string"
+      },
+      "responseExample": {
+        "jobId": "job_123",
+        "status": "pending"
+      },
+      "usageNotes": "Fast only lists this provider and its docs; execution happens directly against the provider."
+    }
+  ]
+}
