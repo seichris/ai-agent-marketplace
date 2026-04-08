@@ -20,6 +20,7 @@
     "dev:apify-service": "tsx apps/apify-service/src/index.ts",
     "dev:facilitator": "tsx apps/facilitator/src/index.ts",
     "dev:tavily-service": "tsx apps/tavily-service/src/index.ts",
+    "dev:valyu-service": "tsx apps/valyu-service/src/index.ts",
     "dev:worker": "tsx apps/worker/src/index.ts",
     "dev:web": "npm run dev --workspace @marketplace/web",
     "cli": "tsx packages/cli/src/index.ts",
@@ -27,6 +28,7 @@
     "start:apify-service": "node dist/apps/apify-service/index.js",
     "start:facilitator": "node dist/apps/facilitator/index.js",
     "start:tavily-service": "node dist/apps/tavily-service/index.js",
+    "start:valyu-service": "node dist/apps/valyu-service/index.js",
     "start:worker": "node dist/apps/worker/index.js",
     "start:web": "npm run start --workspace @marketplace/web",
     "start:cli": "node dist/packages/cli/index.js"
@@ -48,6 +50,7 @@
     "zod-to-json-schema": "^3.24.6"
   },
   "optionalDependencies": {
+    "@esbuild/linux-x64": "0.27.4",
     "@next/swc-linux-x64-gnu": "^16.1.7",
     "@tailwindcss/oxide-linux-x64-gnu": "4.2.1",
     "@rollup/rollup-linux-x64-gnu": "^4.59.0",
