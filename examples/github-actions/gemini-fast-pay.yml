@@ -1,4 +1,4 @@
-name: Claude Code Fast Pay
+name: Gemini Fast Pay
 
 on:
   workflow_dispatch:
@@ -24,19 +24,20 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Claude Code with Fast marketplace MCP
-        uses: anthropics/claude-code-base-action@beta
+      - name: Run Gemini with Fast marketplace MCP
+        uses: google-github-actions/run-gemini-cli@v0
         with:
+          gemini_api_key: ${{ secrets.GEMINI_API_KEY }}
           prompt: |
             Review this pull request with Fast marketplace tools enabled.
 
             Constraints:
             - Use Fast tools only for the approved route refs in the CI config.
             - For sync external research, prefer `tavily.search`.
-            - For async SERP enrichment, call `apify-google-search.search-results` and poll with `marketplace_get_job`.
+            - For async SERP enrichment, call `apify-google-search.search-results`.
+            - Poll async jobs before concluding.
             - Summarize any external findings directly in the PR response.
-          allowed_tools: "Bash(git:*),View,GlobTool,GrepTool,BatchTool,mcp__fast-pay__marketplace_search,mcp__fast-pay__marketplace_show,mcp__fast-pay__marketplace_call,mcp__fast-pay__marketplace_get_job"
-          mcp_config: |
+          settings: |
             {
               "mcpServers": {
                 "fast-pay": {
@@ -51,8 +52,3 @@ jobs:
                 }
               }
             }
-          claude_env: |
-            FAST_MARKETPLACE_CONFIG: ${{ github.workspace }}/examples/fast-marketplace.ci.config.json
-            MARKETPLACE_API_BASE_URL: ${{ secrets.MARKETPLACE_API_BASE_URL }}
-            MARKETPLACE_FAST_NETWORK: ${{ secrets.MARKETPLACE_FAST_NETWORK }}
-          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
