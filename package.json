@@ -14,6 +14,7 @@
     "build:web": "npm run build --workspace @marketplace/web",
     "build": "npm run typecheck && npm run build:runtime && npm run build:web",
     "test": "vitest run",
+    "test:mcp:ci-smoke": "node --import tsx scripts/verify-fast-pay-mcp-ci.ts",
     "test:web:smoke": "npm run build:web && playwright test --config apps/web/playwright.config.ts",
     "dev:api": "tsx apps/api/src/index.ts",
     "dev:apify-service": "tsx apps/apify-service/src/index.ts",
