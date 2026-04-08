@@ -13,7 +13,8 @@ test-results
 !.env*.example
 .envrc
 .direnv/
-.tmp/provider-seeds/
+.tmp/
+tmp/
 *.log
 npm-debug.log*
 yarn-debug.log*
